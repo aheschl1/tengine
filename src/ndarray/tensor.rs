@@ -1,6 +1,6 @@
-use std::ops::{Index, IndexMut};
+use std::{cmp::Ordering, ops::{Index, IndexMut}};
 
-use crate::{ndarray::{TensorOwned, TensorView, TensorViewMut, Dim, Shape, Stride}};
+use crate::ndarray::{Dim, Shape, Stride, TensorOwned, TensorView, TensorViewMut, shape_to_stride};
 
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -19,6 +19,7 @@ pub enum Idx {
 
 pub trait ViewableTensor<T: Sized> {
     fn view(&self) -> TensorView<'_, T>;
+    fn view_as(&self, shape: Shape) -> Result<TensorView<'_, T>, TensorError>;
 }
 pub trait ViewableTensorMut<T: Sized>: ViewableTensor<T> {
     fn view_mut(&mut self) -> TensorViewMut<'_, T>;
@@ -33,6 +34,23 @@ impl<T: Sized> ViewableTensor<T> for TensorOwned<T> {
             shape: self.shape.clone(),
         }
     }
+    fn view_as(&self, shape: Shape) -> Result<TensorView<'_, T>, TensorError> {
+        let new_size: usize = shape.iter().product();
+        let old_size: usize = self.size();
+        match new_size.cmp(&old_size) {
+            Ordering::Equal => {
+                let tensor = TensorView{
+                    raw: &self.raw,
+                    stride: shape_to_stride(&shape),
+                    offset: 0,
+                    shape,
+                };
+                Ok(tensor)
+            },
+            _ => Err(TensorError::InvalidShape)
+        }
+        
+    }
 }
 // TODO beware vec clones of Shape and Stride
 impl<T: Sized> ViewableTensor<T> for TensorView<'_, T> {
@@ -44,6 +62,23 @@ impl<T: Sized> ViewableTensor<T> for TensorView<'_, T> {
             shape: self.shape.clone(),
         }
     }
+    
+    fn view_as(&self, shape: Shape) -> Result<TensorView<'_, T>, TensorError> {
+        let new_size: usize = shape.iter().product();
+        let old_size = self.size();
+        match new_size.cmp(&old_size) {
+            Ordering::Equal => {
+                let tensor = TensorView{
+                    raw: self.raw,
+                    stride: shape_to_stride(&shape),
+                    offset: self.offset,
+                    shape,
+                };
+                Ok(tensor)
+            },
+            _ => Err(TensorError::InvalidShape)
+        }
+    }
 }
 
 impl<T: Sized> ViewableTensor<T> for TensorViewMut<'_, T> {
@@ -53,6 +88,23 @@ impl<T: Sized> ViewableTensor<T> for TensorViewMut<'_, T> {
             stride: self.stride.clone(),
             offset: self.offset,
             shape: self.shape.clone(),
+        }
+    }
+
+    fn view_as(&self, shape: Shape) -> Result<TensorView<'_, T>, TensorError> {
+        let new_size: usize = shape.iter().product();
+        let old_size = self.size();
+        match new_size.cmp(&old_size) {
+            Ordering::Equal => {
+                let tensor = TensorView{
+                    raw: self.raw,
+                    stride: shape_to_stride(&shape),
+                    offset: self.offset,
+                    shape,
+                };
+                Ok(tensor)
+            },
+            _ => Err(TensorError::InvalidShape)
         }
     }
 }
@@ -81,7 +133,7 @@ impl<T: Sized> ViewableTensorMut<T> for TensorOwned<T> {
 
 pub trait Tensor<T>: Sized {
     /// Get the size of a specific dimension
-    fn size(&self, dim: Dim) -> Dim;
+    fn dim(&self, dim: Dim) -> Dim;
     /// Get the shape of the tensor
     fn shape(&self) -> Shape;
     /// Get the number of dimensions
@@ -101,8 +153,8 @@ pub trait Tensor<T>: Sized {
     /// Get the stride of the tensor
     fn stride(&self) -> Stride;
     /// Get the total number of elements in the tensor
-    fn num_elements(&self) -> usize {
-        self.shape().iter().fold(1, |p, x| p * x)
+    fn size(&self) -> usize {
+        self.shape().iter().product()
     }
     /// Create a slice/view of the tensor along a specific dimension at a given index
     fn slice<'a>(&'a self, dim: Dim, idx: Dim) -> Result<TensorView<'a, T>, TensorError> where Self: Sized;
@@ -169,7 +221,7 @@ where W: ViewableTensor<T>
         if dim >= self.dims() {
             return Err(TensorError::InvalidDim);
         }
-        if idx >= self.size(dim) {
+        if idx >= self.dim(dim) {
             return Err(TensorError::IdxOutOfBounds);
         }
         let mut new_shape = self.shape();
@@ -183,7 +235,7 @@ where W: ViewableTensor<T>
         Ok(v)
     }
     
-    fn size(&self, dim: Dim) -> Dim {
+    fn dim(&self, dim: Dim) -> Dim {
         self.shape()[dim]
     }
 }
@@ -222,7 +274,7 @@ where W: ViewableTensorMut<T>
         if dim >= self.dims() {
             return Err(TensorError::InvalidDim);
         }
-        if idx >= self.size(dim) {
+        if idx >= self.dim(dim) {
             return Err(TensorError::IdxOutOfBounds);
         }
         let mut new_shape = self.shape().clone();

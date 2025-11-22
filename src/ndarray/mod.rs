@@ -18,7 +18,7 @@ pub struct TensorView<'a, T: Sized>{
     raw: &'a [T], // row major order
     stride: Stride,
     shape: Shape,
-    offset: usize,
+    pub(crate) offset: usize,
 }
 
 #[derive(Debug)]
@@ -26,7 +26,7 @@ pub struct TensorViewMut<'a, T: Sized>{
     raw: &'a mut [T], // row major order
     stride: Stride,
     shape: Shape,
-    offset: usize,
+    pub(crate) offset: usize,
 }
 
 impl<T: Sized> TensorOwned<T> {
@@ -77,7 +77,7 @@ impl<T: Sized> TensorOwned<T> {
     }
 }
 
-fn shape_to_stride(shape: &Shape) -> Stride {
+pub(crate) fn shape_to_stride(shape: &Shape) -> Stride {
     let mut stride = vec![1; shape.len()];   
     for i in (0..shape.len()).rev(){
         if i < shape.len() - 1 {
