@@ -1,2 +1,1 @@
-pub mod tensor;
-pub mod utils;
+pub mod ndarray;
