@@ -12,33 +12,35 @@ pub enum TensorError {
 }
 
 pub trait AsView<T> {
-    fn as_view<'a>(&'a self) -> TensorView<'a, T>;
+    fn view(&self) -> TensorView<'_, T>;
 }
 
-pub trait AsViewMut<T> {
-    fn as_view_mut<'a>(&'a mut self) -> TensorViewMut<'a, T>;
+pub trait AsViewMut<T> : AsView<T> {
+    fn view_mut(&mut self) -> TensorViewMut<'_, T>;
 }
 
 impl<T> AsView<T> for TensorOwned<T> {
-    fn as_view<'a>(&'a self) -> TensorView<'a, T> {
+    fn view(&self) -> TensorView<'_, T> {
         TensorView::from_parts(self.raw.as_ref(), self.shape.clone(), self.stride.clone(), 0)
     }
 }
 
 impl<T> AsViewMut<T> for TensorOwned<T> {
-    fn as_view_mut<'a>(&'a mut self) -> TensorViewMut<'a, T> {
+    fn view_mut<'a>(&'a mut self) -> TensorViewMut<'a, T> {
         TensorViewMut::from_parts(self.raw.as_mut(), self.shape.clone(), self.stride.clone(), 0)
     }
 }
 
-impl<T> AsView<T> for TensorViewBase<'_, T, &[T]> {
-    fn as_view<'a>(&'a self) -> TensorView<'a, T> {
+impl<T, B> AsView<T> for TensorViewBase<'_, T, B> 
+where B: AsRef<[T]>
+{
+    fn view<'a>(&'a self) -> TensorView<'a, T> {
         TensorView::from_parts(self.raw.as_ref(), self.shape.clone(), self.stride.clone(), self.offset)
     }
 }
 
 impl<T> AsViewMut<T> for TensorViewMut<'_, T> {
-    fn as_view_mut<'a>(&'a mut self) -> TensorViewMut<'a, T> {
+    fn view_mut<'a>(&'a mut self) -> TensorViewMut<'a, T> {
         TensorViewMut::from_parts(self.raw.as_mut(), self.shape.clone(), self.stride.clone(), self.offset)
     }
 }
@@ -111,8 +113,8 @@ where B: AsRef<[T]>
 
     fn slice(&self, dim: Dim, idx: Dim) -> Result<TensorView<'_, T>, TensorError> where Self: Sized {
         let (new_shape, new_stride, offset) = compute_sliced_parameters(
-            &self.shape(), 
-            &self.stride(), 
+            self.shape(), 
+            self.stride(), 
             &self.offset,
             dim, 
             idx
@@ -134,20 +136,13 @@ impl<T> TensorMut<T> for TensorViewMut<'_, T>
         self.raw.get_mut(idx).ok_or(TensorError::IdxOutOfBounds)
     }
 
-    fn slice_mut<'a>(&'a mut self, dim: Dim, idx: Dim) -> Result<TensorViewMut<'a, T>, TensorError> where Self: Sized {
-        let (new_shape, new_stride, offset) = compute_sliced_parameters(
-            &self.shape(), 
-            &self.stride(), 
-            &self.offset,
-            dim, 
-            idx
-        )?;
-        let mut v = self.as_view_mut();
-        v.shape = new_shape;
-        v.stride = new_stride;
-        v.offset = offset;
-        Ok(v)
+    fn slice_mut(&mut self, dim: Dim, idx: Dim) -> Result<TensorViewMut<'_, T>, TensorError> {
+        let (new_shape, new_stride, offset) =
+            compute_sliced_parameters(self.shape(), self.stride(), &self.offset, dim, idx)?;
+    
+        Ok(TensorViewMut::from_parts(self.raw, new_shape, new_stride, offset))
     }
+
 }
 
 impl<'a, T, B, S: Into<Idx<'a>>> Index<S> for TensorViewBase<'a, T, B> 
@@ -187,7 +182,7 @@ fn logical_to_buffer_idx(idx: &Idx, stride: &Stride, offset: usize) -> Result<us
             }
         },
         Idx::At(i) => {
-            logical_to_buffer_idx(&Idx::Coord(&[*i]), stride, offset)
+            logical_to_buffer_idx(&Idx::At(*i), stride, offset)
         }
     }
 }
