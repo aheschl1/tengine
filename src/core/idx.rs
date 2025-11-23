@@ -1,4 +1,4 @@
-use crate::ndarray::Dim;
+use crate::core::Dim;
 
 pub enum Idx<'a> {
     Coord(&'a [Dim]),

@@ -10,7 +10,7 @@ pub use primitives::{Tensor, TensorViewBase, TensorView, TensorViewMut};
 
 #[cfg(test)]
 mod tests {
-    use crate::ndarray::{Shape, Stride, Tensor, MetaTensor, idx::Idx, MetaTensorView, tensor::{AsView, AsViewMut, TensorAccess, TensorError, TensorMut}};
+    use crate::core::{Shape, Stride, Tensor, MetaTensor, idx::Idx, MetaTensorView, tensor::{AsView, AsViewMut, TensorAccess, TensorError, TensorMut}};
 
     fn make_tensor<T>(buf: Vec<T>, shape: Shape) -> Tensor<T> {
         Tensor::from_buf(buf, shape).unwrap()

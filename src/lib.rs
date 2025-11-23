@@ -1,1 +1,1 @@
-pub mod ndarray;
+pub mod core;

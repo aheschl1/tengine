@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
-use crate::ndarray::{shape_to_stride, Shape, MetaTensor};
-use crate::ndarray::tensor::TensorError;
+use crate::core::{shape_to_stride, Shape, MetaTensor};
+use crate::core::tensor::TensorError;
 
 /// An owned, contiguous tensor stored in row-major order.
 ///

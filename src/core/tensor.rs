@@ -1,6 +1,6 @@
 use std::ops::{Index, IndexMut};
 
-use crate::ndarray::{Dim, Shape, Stride, Tensor, TensorView, TensorViewBase, TensorViewMut, idx::Idx, MetaTensor};
+use crate::core::{Dim, Shape, Stride, Tensor, TensorView, TensorViewBase, TensorViewMut, idx::Idx, MetaTensor};
 
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
