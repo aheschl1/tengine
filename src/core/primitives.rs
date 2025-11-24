@@ -36,8 +36,6 @@ where
     pub(crate) raw: &'a B::Buf,
     pub(crate) backend: &'a B,
     pub(crate) meta: MetaTensor,
-    pub(crate) _l: PhantomData<&'a ()>,
-    pub(crate) _t: PhantomData<T>,
 }
 
 pub struct TensorViewMut<'a, T, B>
@@ -48,8 +46,6 @@ where
     pub(crate) raw: &'a mut B::Buf,
     pub(crate) backend: &'a B,
     pub(crate) meta: MetaTensor,
-    pub(crate) _l: PhantomData<&'a ()>,
-    pub(crate) _t: PhantomData<T>,
 }
 
 impl<'a, T, B> TensorView<'a, T, B>
@@ -68,8 +64,6 @@ where
             raw,
             backend,
             meta,
-            _l: PhantomData,
-            _t: PhantomData,
         }
     }
 
@@ -110,8 +104,6 @@ where
             raw,
             backend,
             meta,
-            _l: PhantomData,
-            _t: PhantomData,
         }
     }
 
