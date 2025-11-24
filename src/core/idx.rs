@@ -6,10 +6,29 @@ pub enum Idx<'a> {
     Item
 }
 
+impl<'a> From<&Idx<'a>> for Idx<'a> {
+    /// Clones an index reference into an owned index.
+    fn from(value: &Idx<'a>) -> Self {
+        match value {
+            Idx::Coord(coords) => Idx::Coord(coords),
+            Idx::At(i) => Idx::At(*i),
+            Idx::Item => Idx::Item,
+        }
+    }
+}
+
 impl<'a> From<&'a [Dim]> for Idx<'a>
 {
     /// Converts a slice of coordinates into a multi-dimensional index.
     fn from(value: &'a [Dim]) -> Self {
+        Idx::Coord(value)
+    }
+}
+
+impl<'a, const C: usize> From<&'a [Dim; C]> for Idx<'a>
+{
+    /// Converts a slice of coordinates into a multi-dimensional index.
+    fn from(value: &'a [Dim; C]) -> Self {
         Idx::Coord(value)
     }
 }

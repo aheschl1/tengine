@@ -1,6 +1,6 @@
 use std::ops::{Index, IndexMut};
 
-use crate::core::{Dim, Shape, Stride, Tensor, TensorView, TensorViewBase, TensorViewMut, idx::Idx, MetaTensor};
+use crate::{backend::{Backend, cpu::Cpu}, core::{CpuTensor, CpuTensorView, Dim, MetaTensor, Shape, Stride, TensorView, TensorViewMut, idx::Idx, primitives::{CpuTensorViewMut, TensorValue}}};
 
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -8,74 +8,74 @@ pub enum TensorError {
     IdxOutOfBounds,
     WrongDims,
     InvalidShape,
-    InvalidDim
+    InvalidDim,
+    SizeMismatch,
 }
 
-pub trait AsView<T> {
+pub trait AsView<T: TensorValue, B: Backend<T>> {
     /// Returns an immutable view over the tensor data, sharing the same
     /// underlying buffer and metadata (shape/stride/offset) without copying.
-    fn view(&self) -> TensorView<'_, T>;
+    fn view(&self) -> TensorView<'_, T, B>;
 }
 
-pub trait AsViewMut<T> : AsView<T> {
+pub trait AsViewMut<T: TensorValue, B: Backend<T>> : AsView<T, B> {
     /// Returns a mutable view over the tensor data, sharing the same
     /// underlying buffer and metadata (shape/stride/offset) without copying.
-    fn view_mut(&mut self) -> TensorViewMut<'_, T>;
+    fn view_mut(&mut self) -> TensorViewMut<'_, T, B>;
 }
 
-impl<T> AsView<T> for Tensor<T> {
-    fn view(&self) -> TensorView<'_, T> {
-        TensorView::from_parts(self.raw.as_ref(), self.meta.clone())
+impl<T: TensorValue> AsView<T, Cpu> for CpuTensor<T> {
+    fn view(&self) -> CpuTensorView<'_, T> {
+        CpuTensorView::from_parts(
+            &self.raw, 
+            &self.backend, 
+            self.meta.clone()
+        )
     }
 }
 
-impl<T> AsViewMut<T> for Tensor<T> {
-    fn view_mut<'a>(&'a mut self) -> TensorViewMut<'a, T> {
-        TensorViewMut::from_parts(self.raw.as_mut(), self.meta.clone())
+impl<T: TensorValue> AsViewMut<T, Cpu> for CpuTensor<T> {
+    fn view_mut<'a>(&'a mut self) -> CpuTensorViewMut<'a, T> {
+        CpuTensorViewMut::from_parts(
+            &mut self.raw, 
+            &self.backend, 
+            self.meta.clone()
+        )
     }
 }
 
-impl<T, B> AsView<T> for TensorViewBase<'_, T, B> 
-where B: AsRef<[T]>
+impl<T: TensorValue, B: Backend<T>> AsView<T, B> for TensorView<'_, T, B> 
 {
-    fn view<'a>(&'a self) -> TensorView<'a, T> {
-        TensorView::from_parts(self.raw.as_ref(), self.meta.clone())
+    fn view<'a>(&'a self) -> TensorView<'a, T, B> {
+        TensorView::from_parts(
+            self.raw, 
+            &self.backend, 
+            self.meta.clone()
+        )
     }
 }
 
-impl<T> AsViewMut<T> for TensorViewMut<'_, T> {
-    fn view_mut<'a>(&'a mut self) -> TensorViewMut<'a, T> {
-        TensorViewMut::from_parts(self.raw.as_mut(), self.meta.clone())
-    }
-}
 
-
-pub trait TensorAccess<T>: Sized {
+pub trait TensorAccess<T: TensorValue, B: Backend<T>>: Sized {
     /// Get element at given index
-    fn get(&self, idx: &Idx) -> Result<&T, TensorError>;
+    fn get<'a, I: Into<Idx<'a>>>(&self, idx: I) -> Result<T, TensorError>;
 
-    fn item(&self) -> Result<&T, TensorError> {
-        self.get(&Idx::Item)
+    fn item(&self) -> Result<T, TensorError> {
+        self.get(Idx::Item)
     }
     /// Create a slice/view of the tensor along a specific dimension at a given index
-    fn slice<'a>(&'a self, dim: Dim, idx: Dim) -> Result<TensorView<'a, T>, TensorError> where Self: Sized;
+    fn slice<'a>(&'a self, dim: Dim, idx: Dim) -> Result<TensorView<'a, T, B>, TensorError> where Self: Sized;
 }
 
-pub trait TensorMut<T>: TensorAccess<T> {
-    /// Get mutable element at given index
-    fn get_mut(&mut self, idx: &Idx) -> Result<&mut T, TensorError>;
+pub trait TensorAccessMut<T: TensorValue, B: Backend<T>>: TensorAccess<T, B> {
     /// Slice mutable tensor to get a mutable view
-    fn slice_mut<'a>(&'a mut self, dim: Dim, idx: Dim) -> Result<TensorViewMut<'a, T>, TensorError> where Self: Sized;
+    fn slice_mut<'a>(&'a mut self, dim: Dim, idx: Dim) -> Result<TensorViewMut<'a, T, B>, TensorError> where Self: Sized;
     /// sets a value at given index
-    fn set(&mut self, idx: &Idx, value: T) -> Result<(), TensorError> {
-        let slot = self.get_mut(idx)?;
-        *slot = value;
-        Ok(())
-    }
+    fn set<'a, I: Into<Idx<'a>>>(&mut self, idx: I, value: T) -> Result<(), TensorError>;
 }
 
-impl<T, B> TensorAccess<T> for TensorViewBase<'_, T, B>
-where B: AsRef<[T]>
+impl<T: TensorValue, B: Backend<T>> TensorAccess<T, B> for TensorView<'_, T, B>
+where B: Backend<T>
 {
     /// Returns a reference to the element at a logical index, converting
     /// coordinates into a buffer position via stride and offset.
@@ -83,9 +83,9 @@ where B: AsRef<[T]>
     /// Errors
     /// - `WrongDims` if the index rank doesn't match the tensor rank.
     /// - `IdxOutOfBounds` if the computed buffer index is outside the backing slice.
-    fn get(&self, idx: &Idx) -> Result<&T, TensorError> {
-        let idx = logical_to_buffer_idx(idx, self.meta.stride(), self.meta.offset())?;
-        self.raw.as_ref().get(idx).ok_or(TensorError::IdxOutOfBounds)
+    fn get<'a, I: Into<Idx<'a>>>(&self, idx: I) -> Result<T, TensorError> {
+        let idx = logical_to_buffer_idx(&idx.into(), self.meta.stride(), self.meta.offset())?;
+        self.backend.read(self.raw, idx)
     }
 
     /// Creates a new immutable view by fixing `dim` to `idx`, effectively
@@ -94,7 +94,7 @@ where B: AsRef<[T]>
     /// Errors
     /// - `InvalidDim` if `dim` is out of range.
     /// - `IdxOutOfBounds` if `idx` exceeds the size of `dim`.
-    fn slice(&self, dim: Dim, idx: Dim) -> Result<TensorView<'_, T>, TensorError> where Self: Sized {
+    fn slice(&self, dim: Dim, idx: Dim) -> Result<TensorView<'_, T, B>, TensorError> where Self: Sized {
         let (new_shape, new_stride, offset) = compute_sliced_parameters(
             self.meta.shape(), 
             self.meta.stride(), 
@@ -103,63 +103,93 @@ where B: AsRef<[T]>
             idx
         )?;
         
-        let v = TensorView::from_parts(self.raw.as_ref(), MetaTensor::new(new_shape, new_stride, offset));
+        let v = TensorView::from_parts(self.raw, self.backend, MetaTensor::new(new_shape, new_stride, offset));
         Ok(v)
     }
 }
 
-impl<T> TensorMut<T> for TensorViewMut<'_, T>
+impl<T: TensorValue, B: Backend<T>> TensorAccess<T, B> for TensorViewMut<'_, T, B>
+where B: Backend<T>
 {
-    /// Returns a mutable reference to the element at a logical index, converting
+    /// Returns a reference to the element at a logical index, converting
     /// coordinates into a buffer position via stride and offset.
     ///
     /// Errors
     /// - `WrongDims` if the index rank doesn't match the tensor rank.
     /// - `IdxOutOfBounds` if the computed buffer index is outside the backing slice.
-    fn get_mut(&mut self, idx: &Idx) -> Result<&mut T, TensorError> {
-        let idx = logical_to_buffer_idx(idx, self.meta.stride(), self.meta.offset())?;
-        self.raw.get_mut(idx).ok_or(TensorError::IdxOutOfBounds)
+    fn get<'a, I: Into<Idx<'a>>>(&self, idx: I) -> Result<T, TensorError> {
+        let idx = logical_to_buffer_idx(&idx.into(), self.meta.stride(), self.meta.offset())?;
+        self.backend.read(self.raw, idx)
     }
 
+    /// Creates a new immutable view by fixing `dim` to `idx`, effectively
+    /// removing that dimension and adjusting shape/stride/offset accordingly.
+    ///
+    /// Errors
+    /// - `InvalidDim` if `dim` is out of range.
+    /// - `IdxOutOfBounds` if `idx` exceeds the size of `dim`.
+    fn slice(&self, dim: Dim, idx: Dim) -> Result<TensorView<'_, T, B>, TensorError> where Self: Sized {
+        let (new_shape, new_stride, offset) = compute_sliced_parameters(
+            self.meta.shape(), 
+            self.meta.stride(), 
+            &self.meta.offset(),
+            dim, 
+            idx
+        )?;
+        
+        let v = TensorView::from_parts(self.raw, self.backend, MetaTensor::new(new_shape, new_stride, offset));
+        Ok(v)
+    }
+}
+
+
+impl<T: TensorValue, B: Backend<T>> TensorAccessMut<T, B> for TensorViewMut<'_, T, B>
+{
     /// Creates a new mutable view by fixing `dim` to `idx`, effectively
     /// removing that dimension and adjusting shape/stride/offset accordingly.
     ///
     /// Errors
     /// - `InvalidDim` if `dim` is out of range.
     /// - `IdxOutOfBounds` if `idx` exceeds the size of `dim`.
-    fn slice_mut(&mut self, dim: Dim, idx: Dim) -> Result<TensorViewMut<'_, T>, TensorError> {
+    fn slice_mut(&mut self, dim: Dim, idx: Dim) -> Result<TensorViewMut<'_, T, B>, TensorError> {
         let (new_shape, new_stride, offset) =
             compute_sliced_parameters(self.meta.shape(), self.meta.stride(), &self.meta.offset(), dim, idx)?;
     
-        Ok(TensorViewMut::from_parts(self.raw, MetaTensor::new(new_shape, new_stride, offset)))
+        Ok(TensorViewMut::from_parts(self.raw, self.backend, MetaTensor::new(new_shape, new_stride, offset)))
+    }
+    
+    fn set<'a, I: Into<Idx<'a>>>(&mut self, idx: I, value: T) -> Result<(), TensorError> {
+        let idx = idx.into();
+        let buf_idx = logical_to_buffer_idx(&idx, self.meta.stride(), self.meta.offset())?;
+        self.backend.write(self.raw, buf_idx, value)
     }
 
 }
 
 
-impl<'a, T, B, S: Into<Idx<'a>>> Index<S> for TensorViewBase<'a, T, B> 
-    where B: AsRef<[T]> + 'a
-{
-    type Output = T;
+// impl<'a, T, B, S: Into<Idx<'a>>> Index<S> for TensorViewBase<'a, T, B> 
+//     where B: AsRef<[T]> + 'a
+// {
+//     type Output = T;
 
-    /// Indexes the view at a logical index and returns a reference.
-    ///
-    /// Panics
-    /// - If the index is out of bounds or has the wrong rank.
-    fn index(&self, index: S) -> &Self::Output {
-        self.get(&index.into()).unwrap()
-    }
-}
+//     /// Indexes the view at a logical index and returns a reference.
+//     ///
+//     /// Panics
+//     /// - If the index is out of bounds or has the wrong rank.
+//     fn index(&self, index: S) -> &Self::Output {
+//         self.get(&index.into()).unwrap()
+//     }
+// }
 
-impl<'a, T, S: Into<Idx<'a>>> IndexMut<S> for TensorViewMut<'a, T> {
-    /// Indexes the view at a logical index and returns a mutable reference.
-    ///
-    /// Panics
-    /// - If the index is out of bounds or has the wrong rank.
-    fn index_mut(&mut self, index: S) -> &mut Self::Output {
-        self.get_mut(&index.into()).unwrap()
-    }
-}
+// impl<'a, T, S: Into<Idx<'a>>> IndexMut<S> for CpuTensorViewMut<'a, T> {
+//     /// Indexes the view at a logical index and returns a mutable reference.
+//     ///
+//     /// Panics
+//     /// - If the index is out of bounds or has the wrong rank.
+//     fn index_mut(&mut self, index: S) -> &mut Self::Output {
+//         self.get_mut(&index.into()).unwrap()
+//     }
+// }
 
 
 /// Converts a logical index (coordinate, single position, or scalar) into a

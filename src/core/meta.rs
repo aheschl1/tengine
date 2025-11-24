@@ -1,4 +1,6 @@
-use super::primitives::{Tensor, TensorViewBase};
+use crate::{backend::Backend, core::{TensorViewMut, primitives::{TensorBase, TensorValue}}};
+
+use super::primitives::{CpuTensor, TensorView};
 
 pub type Dim = usize;
 pub type Stride = Vec<usize>;
@@ -102,15 +104,27 @@ impl MetaTensorView for MetaTensor {
     fn offset(&self) -> usize { self.offset() }
 }
 
-impl<T> MetaTensorView for Tensor<T> {
+impl<B, T: TensorValue> MetaTensorView for TensorBase<B, T> 
+where
+    B: Backend<T>,
+{
     fn shape(&self) -> &Shape { self.meta.shape() }
     fn stride(&self) -> &Stride { self.meta.stride() }
     fn offset(&self) -> usize { self.meta.offset() }
 }
 
-impl<T, B> MetaTensorView for TensorViewBase<'_, T, B>
+impl<T: TensorValue, B> MetaTensorView for TensorView<'_, T, B>
 where
-    B: AsRef<[T]>,
+    B: Backend<T>,
+{
+    fn shape(&self) -> &Shape { self.meta.shape() }
+    fn stride(&self) -> &Stride { self.meta.stride() }
+    fn offset(&self) -> usize { self.meta.offset() }
+}
+
+impl <T: TensorValue, B> MetaTensorView for TensorViewMut<'_, T, B>
+where
+    B: Backend<T>,
 {
     fn shape(&self) -> &Shape { self.meta.shape() }
     fn stride(&self) -> &Stride { self.meta.stride() }
