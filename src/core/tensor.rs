@@ -48,7 +48,7 @@ impl<T: TensorValue, B: Backend<T>> AsView<T, B> for TensorView<'_, T, B>
     fn view<'a>(&'a self) -> TensorView<'a, T, B> {
         TensorView::from_parts(
             self.raw, 
-            self.backend, 
+            self.backend,
             self.meta.clone()
         )
     }

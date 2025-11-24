@@ -191,7 +191,7 @@ mod tests {
         assert_eq!(index_tensor(Idx::At(1), &tensor.view()).unwrap(), 2);
         assert_eq!(index_tensor(Idx::At(2), &tensor.view()).unwrap(), 3);
 
-        tensor.view_mut().set(&Idx::At(1), 1);
+        tensor.view_mut().set(&Idx::At(1), 1).unwrap();
         assert_eq!(index_tensor(Idx::At(1), &tensor.view()).unwrap(), 1);
     }
 
