@@ -155,6 +155,17 @@ impl<B, T: TensorValue> TensorBase<B, T>
 where 
     B: Backend<T>,
 {
+    /// Internal constructor from raw parts. Used for creating tensors from
+    /// existing backend buffers without copying.
+    pub(crate) fn from_parts(backend: B, raw: B::Buf, meta: MetaTensor) -> Self {
+        Self {
+            backend,
+            raw,
+            meta,
+            _t: PhantomData,
+        }
+    }
+
     /// Constructs a tensor from a contiguous buffer in row-major order and a
     /// given shape. Validates that `shape` size equals `raw.len()`.
     ///

@@ -1,5 +1,5 @@
 
-use crate::{backend::{cpu::Cpu, Backend}, core::{idx::Idx, primitives::{CpuTensorViewMut, TensorBase, TensorValue}, CpuTensor, CpuTensorView, Dim, MetaTensor, Shape, Stride, TensorView, TensorViewMut}};
+use crate::{backend::{cpu::Cpu, Backend}, core::{idx::Idx, primitives::{CpuTensorViewMut, TensorBase, TensorValue}, CpuTensor, CpuTensorView, Dim, MetaTensor, MetaTensorView, Shape, Stride, TensorView, TensorViewMut}};
 use thiserror::Error;
 
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
@@ -106,14 +106,36 @@ impl <T: TensorValue, B: Backend<T>> AsTensor<T, B> for TensorBase<B, T> {
 
 impl<'a, T: TensorValue, B: Backend<T>> AsTensor<T, B> for TensorView<'a, T, B> {
     fn owned(&self) -> TensorBase<B, T> {
-        todo!()
+        view_to_owned(&self.meta, self.raw, self.backend).unwrap()
     }
 }
 
 impl<'a, T: TensorValue, B: Backend<T>> AsTensor<T, B> for TensorViewMut<'a, T, B> {
     fn owned(&self) -> TensorBase<B, T> {
-        todo!()
+        view_to_owned(&self.meta, self.raw, self.backend).unwrap()
     }
+}
+
+#[inline]
+fn view_to_owned<T: TensorValue, B: Backend<T>>(meta: &MetaTensor, raw: &B::Buf, backend: &B) -> Result<TensorBase<B, T>, TensorError> {
+    let size = meta.size();
+    let new_backend = B::new();
+    let mut new_buf = new_backend.alloc(size)?;
+    
+    // Copy element by element from the view to the new contiguous buffer
+    // The view might be non-contiguous (e.g., a column slice), so we iterate
+    // through all logical positions and copy to sequential positions in the new buffer
+    for (new_idx, old_offset) in meta.iter_offsets().enumerate() {
+        let value = backend.read(raw, old_offset)?;
+        new_backend.write(&mut new_buf, new_idx, value)?;
+    }
+    
+    // Create a new tensor with contiguous layout (standard row-major stride)
+    let new_shape = meta.shape().clone();
+    let new_stride = super::shape_to_stride(&new_shape);
+    let new_meta = MetaTensor::new(new_shape, new_stride, 0);
+    
+    Ok(TensorBase::from_parts(new_backend, new_buf, new_meta))
 }
 
 pub trait TensorAccess<T: TensorValue, B: Backend<T>>: Sized {

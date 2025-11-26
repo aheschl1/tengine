@@ -116,6 +116,7 @@ pub fn shape_to_stride(shape: &Shape) -> Stride {
 
 /// Checks whether a layout (shape/stride) is contiguous in a relaxed sense:
 /// ignores singleton dimensions and accepts empty shapes.
+#[inline]
 pub(crate) fn is_contiguous_relaxed(shape: &Shape, stride: &Stride) -> bool {
     if shape.is_empty() { return true; }
     if shape.contains(&0) { return true; }

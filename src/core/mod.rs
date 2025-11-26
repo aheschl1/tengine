@@ -10,7 +10,7 @@ pub use primitives::{CpuTensor, TensorView, CpuTensorView, TensorViewMut};
 
 #[cfg(test)]
 mod tests {
-    use crate::{backend::Backend, core::{CpuTensor, MetaTensor, MetaTensorView, Shape, Stride, idx::Idx, primitives::TensorValue, tensor::{AsView, AsViewMut, TensorAccess, TensorAccessMut, TensorError}}};
+    use crate::{backend::Backend, core::{CpuTensor, MetaTensor, MetaTensorView, Shape, Stride, idx::Idx, primitives::TensorValue, tensor::{AsView, AsViewMut, AsTensor, TensorAccess, TensorAccessMut, TensorError}}};
 
     fn make_tensor<T: TensorValue>(buf: Vec<T>, shape: Shape) -> CpuTensor<T> {
         CpuTensor::from_buf(buf, shape).unwrap()
@@ -709,5 +709,94 @@ mod tests {
         let v6 = owned.view();
         let col_like = v6.slice(1, 0).unwrap();
         assert_eq!(col_like.dims(), col_like.stride().len());
+    }
+
+    #[test]
+    fn test_view_to_owned_contiguous() {
+        // Test converting a contiguous view to owned
+        let tensor = make_tensor(vec![1, 2, 3, 4, 5, 6], vec![2, 3]);
+        let view = tensor.view();
+        let owned = view.owned();
+        
+        // Should have same shape and values
+        assert_eq!(owned.shape(), tensor.shape());
+        assert_eq!(owned.raw, tensor.raw);
+        assert!(owned.is_contiguous());
+    }
+
+    #[test]
+    fn test_view_to_owned_noncontiguous_column() {
+        // Test converting a non-contiguous column slice to owned
+        let tensor = make_tensor(vec![1, 2, 3, 4, 5, 6], vec![2, 3]);
+        let view = tensor.view();
+        let col_slice = view.slice(1, 1).unwrap(); // Middle column: [2, 5]
+        
+        // This is non-contiguous (stride [3])
+        assert!(!col_slice.is_contiguous());
+        assert_eq!(*col_slice.shape(), vec![2]);
+        
+        // Convert to owned
+        let owned = col_slice.owned();
+        
+        // Owned should be contiguous with correct values
+        assert!(owned.is_contiguous());
+        assert_eq!(*owned.shape(), vec![2]);
+        assert_eq!(owned.raw, vec![2, 5].into_boxed_slice());
+        assert_eq!(index_tensor(Idx::At(0), &owned.view()).unwrap(), 2);
+        assert_eq!(index_tensor(Idx::At(1), &owned.view()).unwrap(), 5);
+    }
+
+    #[test]
+    fn test_view_to_owned_row_slice() {
+        // Test converting a row slice to owned
+        let tensor = make_tensor(vec![1, 2, 3, 4, 5, 6], vec![2, 3]);
+        let view = tensor.view();
+        let row_slice = view.slice(0, 1).unwrap(); // Second row: [4, 5, 6]
+        
+        assert!(row_slice.is_contiguous());
+        
+        let owned = row_slice.owned();
+        
+        assert_eq!(*owned.shape(), vec![3]);
+        assert_eq!(owned.raw, vec![4, 5, 6].into_boxed_slice());
+    }
+
+    #[test]
+    fn test_view_to_owned_reshaped() {
+        // Test converting a reshaped view to owned
+        let tensor = make_tensor(vec![1, 2, 3, 4, 5, 6], vec![2, 3]);
+        let view = tensor.view();
+        let reshaped = view.view_as(vec![3, 2]).unwrap();
+        
+        let owned = reshaped.owned();
+        
+        assert_eq!(*owned.shape(), vec![3, 2]);
+        assert_eq!(owned.raw, vec![1, 2, 3, 4, 5, 6].into_boxed_slice());
+        assert!(owned.is_contiguous());
+    }
+
+    #[test]
+    fn test_view_to_owned_3d_slice() {
+        // Test converting a 3D slice to owned
+        let tensor = make_tensor(vec![1, 2, 3, 4, 5, 6, 7, 8], vec![2, 2, 2]);
+        let view = tensor.view();
+        let depth_slice = view.slice(0, 1).unwrap(); // Second depth: [5, 6, 7, 8]
+        
+        let owned = depth_slice.owned();
+        
+        assert_eq!(*owned.shape(), vec![2, 2]);
+        assert_eq!(owned.raw, vec![5, 6, 7, 8].into_boxed_slice());
+        assert!(owned.is_contiguous());
+    }
+
+    #[test]
+    fn test_viewmut_to_owned() {
+        // Test that mutable views can also be converted to owned
+        let mut tensor = make_tensor(vec![1, 2, 3, 4, 5, 6], vec![2, 3]);
+        let view_mut = tensor.view_mut();
+        let owned = view_mut.owned();
+        
+        assert_eq!(*owned.shape(), vec![2, 3]);
+        assert_eq!(owned.raw, vec![1, 2, 3, 4, 5, 6].into_boxed_slice());
     }
 }

@@ -19,4 +19,5 @@ Goal to add CUDA and optimized operations.
 ## to optimize
 
 - [ ] Elementwise ops require computing all offsets every time. perhaps cache them
+- [ ] `view_to_owned` can probably be optimized to copy larger chunks at once
 - [ ] Restrict tensor values to require basic operations
