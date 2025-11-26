@@ -9,7 +9,6 @@ use crate::{backend::Backend, core::{primitives::TensorValue, tensor::TensorErro
 pub struct CudaBuf<T: TensorValue> {
     pub(crate) ptr: CudaSlice<T>,
     pub(crate) len: usize,
-    _ctx: Arc<CudaContext> // because if the backend is dropped, the memory may not be freed
 }
 
 pub struct CudaBackend {
@@ -32,7 +31,6 @@ impl<T: TensorValue + DeviceRepr> Backend<T> for CudaBackend {
         Ok(CudaBuf { 
             ptr, 
             len: src.len(),
-            _ctx: self.ctx.clone() 
         })
     }
     
@@ -46,7 +44,6 @@ impl<T: TensorValue + DeviceRepr> Backend<T> for CudaBackend {
         Ok(CudaBuf { 
             ptr, 
             len, 
-            _ctx: self.ctx.clone() 
         })
     }
     
@@ -99,6 +96,14 @@ impl<T: TensorValue + DeviceRepr> Backend<T> for CudaBackend {
         // TODO multiple devices
         let ctx = CudaContext::new(0).expect("Failed to initialize CUDA context");
         Self { ctx }
+    }
+    
+    fn copy(&self, src: &Self::Buf) -> Result<Self::Buf, TensorError> {
+        let mut dst = self.alloc(src.len)?;
+        self.stream()
+            .memcpy_dtod(&src.ptr, &mut dst.ptr)
+            .map_err(|e| TensorError::CudaError(e.to_string()))?;
+        Ok(dst)
     }
 
     

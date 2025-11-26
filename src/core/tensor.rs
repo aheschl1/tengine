@@ -1,5 +1,5 @@
 
-use crate::{backend::{Backend, cpu::Cpu}, core::{CpuTensor, CpuTensorView, Dim, MetaTensor, Shape, Stride, TensorView, TensorViewMut, idx::Idx, primitives::{CpuTensorViewMut, TensorValue}}};
+use crate::{backend::{cpu::Cpu, Backend}, core::{idx::Idx, primitives::{CpuTensorViewMut, TensorBase, TensorValue}, CpuTensor, CpuTensorView, Dim, MetaTensor, Shape, Stride, TensorView, TensorViewMut}};
 use thiserror::Error;
 
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
@@ -37,6 +37,11 @@ pub trait AsViewMut<T: TensorValue, B: Backend<T>> : AsView<T, B> {
     /// Returns a mutable view over the tensor data, sharing the same
     /// underlying buffer and metadata (shape/stride/offset) without copying.
     fn view_mut(&mut self) -> TensorViewMut<'_, T, B>;
+}
+
+pub trait AsTensor<T: TensorValue, B: Backend<T>> {
+    /// Converts to an owned tensor, copying data.
+    fn owned(&self) -> TensorBase<B, T>;
 }
 
 impl<T: TensorValue> AsView<T, Cpu> for CpuTensor<T> {
@@ -92,6 +97,24 @@ impl<T: TensorValue, B: Backend<T>> AsView<T, B> for TensorView<'_, T, B>
     }
 }
 
+
+impl <T: TensorValue, B: Backend<T>> AsTensor<T, B> for TensorBase<B, T> {
+    fn owned(&self) -> TensorBase<B, T> {
+        self.clone()
+    }
+}
+
+impl<'a, T: TensorValue, B: Backend<T>> AsTensor<T, B> for TensorView<'a, T, B> {
+    fn owned(&self) -> TensorBase<B, T> {
+        todo!()
+    }
+}
+
+impl<'a, T: TensorValue, B: Backend<T>> AsTensor<T, B> for TensorViewMut<'a, T, B> {
+    fn owned(&self) -> TensorBase<B, T> {
+        todo!()
+    }
+}
 
 pub trait TensorAccess<T: TensorValue, B: Backend<T>>: Sized {
     /// Get element at given index

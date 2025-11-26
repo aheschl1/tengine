@@ -16,6 +16,19 @@ pub struct TensorBase<B: Backend<T>, T: TensorValue> {
     _t: PhantomData<T>,
 }
 
+impl<B: Backend<T>, T: TensorValue> Clone for TensorBase<B, T> {
+    fn clone(&self) -> Self {
+        let new_backend = B::new();
+        let new_buffer = new_backend.copy(&self.raw).unwrap();
+        Self {
+            backend: new_backend,
+            raw: new_buffer,
+            meta: self.meta.clone(),
+            _t: PhantomData,
+        }
+    }
+}
+
 /// An owned, contiguous tensor stored in row-major order.
 ///
 /// Holds the backing buffer and the associated layout metadata. The `offset`

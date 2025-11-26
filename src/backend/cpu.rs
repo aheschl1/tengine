@@ -1,6 +1,6 @@
 use crate::{backend::Backend, core::{primitives::TensorValue, tensor::TensorError}};
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Cpu;
 
 impl<T: TensorValue> Backend<T> for Cpu {
@@ -57,5 +57,11 @@ impl<T: TensorValue> Backend<T> for Cpu {
             self.write(buf, offset, new_value)?;
         }
         Ok(())
+    }
+    
+    fn copy(&self, src: &Self::Buf) -> Result<Self::Buf, TensorError> {
+        let mut dst = self.alloc(src.len())?;
+        dst.copy_from_slice(src);
+        Ok(dst)
     }
 }

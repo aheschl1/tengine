@@ -1,3 +1,5 @@
+use std::path::Iter;
+
 use crate::{backend::Backend, core::{TensorViewMut, primitives::{TensorBase, TensorValue}}};
 
 use super::primitives::TensorView;
@@ -40,6 +42,64 @@ impl MetaTensor {
     pub fn offset(&self) -> usize { self.offset }
     /// Returns the size of a single dimension by index.
     pub fn dim(&self, dim: Dim) -> Dim { self.shape[dim] }
+    /// returns all offsets in the underlying buffer for this tensor/view.
+    pub fn iter_offsets(&self) -> impl Iterator<Item = usize> + '_ {
+        let shape = self.shape.clone();
+        let stride = self.stride.clone();
+        let offset = self.offset;
+        TensorOffsetIterator::new(shape, stride, offset)
+    }
+}
+
+struct TensorOffsetIterator {
+    shape: Shape,
+    stride: Stride,
+    current_indices: Vec<usize>,
+    done: bool,
+    base_offset: usize,
+}
+
+impl TensorOffsetIterator {
+    fn new(shape: Shape, stride: Stride, base_offset: usize) -> Self {
+        let dims = shape.len();
+        Self {
+            shape,
+            stride,
+            current_indices: vec![0; dims],
+            done: dims == 0, // done immediately for scalar
+            base_offset,
+        }
+    }
+}
+
+impl Iterator for TensorOffsetIterator {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.done {
+            return None;
+        }
+
+        let mut offset = self.base_offset;
+        for (idx, stride) in self.current_indices.iter().zip(self.stride.iter()) {
+            offset += idx * stride;
+        }
+
+        // Increment indices
+        for i in (0..self.current_indices.len()).rev() {
+            self.current_indices[i] += 1;
+            if self.current_indices[i] < self.shape[i] {
+                break;
+            } else {
+                self.current_indices[i] = 0;
+                if i == 0 {
+                    self.done = true;
+                }
+            }
+        }
+
+        Some(offset)
+    }
 }
 
 /// Computes the standard row-major stride for a given shape.
@@ -96,6 +156,12 @@ pub trait MetaTensorView {
     /// Whether the layout is contiguous in row-major order under relaxed rules
     /// (ignoring singleton dimensions).
     fn is_contiguous(&self) -> bool { is_contiguous_relaxed(self.shape(), self.stride()) }
+    fn iter_offsets(&self) -> impl Iterator<Item = usize> + '_ {
+        let shape = self.shape().clone();
+        let stride = self.stride().clone();
+        let offset = self.offset();
+        TensorOffsetIterator::new(shape, stride, offset)
+    }
 }
 
 impl MetaTensorView for MetaTensor {

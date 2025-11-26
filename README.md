@@ -15,3 +15,8 @@ Goal to add CUDA and optimized operations.
 - [ ] Accelerated backends (GPU / parallel)
 - [ ] x86 SIMD paths
 - [ ] Multiple gpu devices allowed
+
+## to optimize
+
+- [ ] Elementwise ops require computing all offsets every time. perhaps cache them
+- [ ] Restrict tensor values to require basic operations
