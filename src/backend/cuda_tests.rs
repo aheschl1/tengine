@@ -475,4 +475,14 @@ mod tests {
         let tensor = make_cuda_tensor(vec![1, 2, 3], vec![3]);
         let _ = tensor.view().get(vec![0, 0]).unwrap();
     }
+
+    #[test]
+    fn rediculously_large_cuda_tensor() {
+        let n = 10_000_000_usize;
+        let buf: Vec<u8> = vec![1; n];
+        let shape = vec![n];
+        let tensor = make_cuda_tensor(buf, shape);
+        assert_eq!(index_tensor(Idx::At(0), &tensor.view()).unwrap(), 1);
+        assert_eq!(index_tensor(Idx::At(n - 1), &tensor.view()).unwrap(), 1);
+    }
 }
