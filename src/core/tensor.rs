@@ -1,5 +1,5 @@
 
-use crate::{backend::{cpu::Cpu, Backend}, core::{idx::Idx, primitives::{CpuTensorViewMut, TensorBase, TensorValue}, CpuTensor, CpuTensorView, Dim, MetaTensor, MetaTensorView, Shape, Stride, TensorView, TensorViewMut}};
+use crate::{backend::Backend, core::{idx::Idx, primitives::{TensorBase, TensorValue}, Dim, MetaTensor, Shape, Stride, TensorView, TensorViewMut}};
 use thiserror::Error;
 
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
@@ -44,41 +44,19 @@ pub trait AsTensor<T: TensorValue, B: Backend<T>> {
     fn owned(&self) -> TensorBase<B, T>;
 }
 
-impl<T: TensorValue> AsView<T, Cpu> for CpuTensor<T> {
-    fn view(&self) -> CpuTensorView<'_, T> {
-        CpuTensorView::from_parts(
+impl<T: TensorValue, B: Backend<T>> AsView<T, B> for TensorBase<B, T> {
+    fn view(&self) -> TensorView<'_, T, B> {
+        TensorView::<T, B>::from_parts(
             &self.raw, 
             &self.backend, 
             self.meta.clone()
         )
     }
-}
+} 
 
-impl<T: TensorValue> AsViewMut<T, Cpu> for CpuTensor<T> {
-    fn view_mut<'a>(&'a mut self) -> CpuTensorViewMut<'a, T> {
-        CpuTensorViewMut::from_parts(
-            &mut self.raw, 
-            &self.backend, 
-            self.meta.clone()
-        )
-    }
-}
-
-#[cfg(feature = "cuda")]
-impl<T: TensorValue + cudarc::driver::DeviceRepr> AsView<T, crate::backend::cuda::CudaBackend> for crate::core::primitives::CudaTensor<T> {
-    fn view(&self) -> crate::core::primitives::CudaTensorView<'_, T> {
-        crate::core::primitives::CudaTensorView::from_parts(
-            &self.raw, 
-            &self.backend, 
-            self.meta.clone()
-        )
-    }
-}
-
-#[cfg(feature = "cuda")]
-impl<T: TensorValue + cudarc::driver::DeviceRepr> AsViewMut<T, crate::backend::cuda::CudaBackend> for crate::core::primitives::CudaTensor<T> {
-    fn view_mut<'a>(&'a mut self) -> crate::core::primitives::CudaTensorViewMut<'a, T> {
-        crate::core::primitives::CudaTensorViewMut::from_parts(
+impl<T: TensorValue, B: Backend<T>> AsViewMut<T, B> for TensorBase<B, T> {
+    fn view_mut<'a>(&'a mut self) -> TensorViewMut<'a, T, B> {
+        TensorViewMut::<T, B>::from_parts(
             &mut self.raw, 
             &self.backend, 
             self.meta.clone()

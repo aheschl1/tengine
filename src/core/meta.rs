@@ -1,5 +1,3 @@
-use std::path::Iter;
-
 use crate::{backend::Backend, core::{TensorViewMut, primitives::{TensorBase, TensorValue}}};
 
 use super::primitives::TensorView;
@@ -66,7 +64,7 @@ impl TensorOffsetIterator {
             shape,
             stride,
             current_indices: vec![0; dims],
-            done: dims == 0, // done immediately for scalar
+            done: false, // Start as not done - even scalars need one iteration
             base_offset,
         }
     }
@@ -78,6 +76,12 @@ impl Iterator for TensorOffsetIterator {
     fn next(&mut self) -> Option<Self::Item> {
         if self.done {
             return None;
+        }
+
+        // Special case for scalars (0 dimensions)
+        if self.shape.is_empty() {
+            self.done = true;
+            return Some(self.base_offset);
         }
 
         let mut offset = self.base_offset;

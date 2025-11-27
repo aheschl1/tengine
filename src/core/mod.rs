@@ -10,7 +10,7 @@ pub use primitives::{CpuTensor, TensorView, CpuTensorView, TensorViewMut};
 
 #[cfg(test)]
 mod tests {
-    use crate::{backend::Backend, core::{CpuTensor, MetaTensor, MetaTensorView, Shape, Stride, idx::Idx, primitives::TensorValue, tensor::{AsView, AsViewMut, AsTensor, TensorAccess, TensorAccessMut, TensorError}}};
+    use crate::{backend::Backend, core::{idx::Idx, primitives::TensorValue, tensor::{AsTensor, AsView, AsViewMut, TensorAccess, TensorAccessMut, TensorError}, CpuTensor, MetaTensor, MetaTensorView, Shape, Stride}};
 
     fn make_tensor<T: TensorValue>(buf: Vec<T>, shape: Shape) -> CpuTensor<T> {
         CpuTensor::from_buf(buf, shape).unwrap()
