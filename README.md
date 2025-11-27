@@ -10,7 +10,7 @@ Goal to add CUDA and optimized operations.
 - [X] Nicer syntax. macro time `tset!(tensor.view_mut(), v: 99, 1, 2)` and `tget!(tensor.view(), 1, 2)`
 - [X] Basic GPU backend
 - [ ] Slicing with ranges
-- [ ] Elementwise broadcasting
+- [X] Elementwise broadcasting
 - [ ] Basic linear algebra helpers
 - [ ] Accelerated backends (GPU / parallel)
 - [ ] x86 SIMD paths
@@ -21,3 +21,5 @@ Goal to add CUDA and optimized operations.
 - [ ] Elementwise ops require computing all offsets every time. perhaps cache them
 - [ ] `view_to_owned` can probably be optimized to copy larger chunks at once
 - [ ] Restrict tensor values to require basic operations
+- [ ] perf sucks ass. take advantage of contiguous memory buffers when available
+- [ ] multiple cuda backends alive?

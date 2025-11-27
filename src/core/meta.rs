@@ -1,4 +1,4 @@
-use crate::{backend::Backend, core::{TensorViewMut, primitives::{TensorBase, TensorValue}}};
+use crate::{backend::Backend, core::{idx::Idx, primitives::TensorBase, value::TensorValue, TensorViewMut}};
 
 use super::primitives::TensorView;
 
@@ -41,6 +41,9 @@ impl MetaTensor {
     /// Returns the size of a single dimension by index.
     pub fn dim(&self, dim: Dim) -> Dim { self.shape[dim] }
     /// returns all offsets in the underlying buffer for this tensor/view.
+    pub fn offsets(&self) -> Vec<usize> {
+        self.iter_offsets().collect::<Vec<usize>>()
+    }
     pub fn iter_offsets(&self) -> impl Iterator<Item = usize> + '_ {
         let shape = self.shape.clone();
         let stride = self.stride.clone();

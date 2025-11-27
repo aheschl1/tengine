@@ -16,7 +16,7 @@ macro_rules! tset {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::{CpuTensor, Shape, primitives::TensorValue, tensor::{AsView, AsViewMut, TensorAccess, TensorAccessMut}};
+    use crate::core::{CpuTensor, Shape, value::TensorValue, tensor::{AsView, AsViewMut, TensorAccess, TensorAccessMut}};
     use crate::core::idx::Idx;
 
 

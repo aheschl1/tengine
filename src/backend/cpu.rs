@@ -1,4 +1,4 @@
-use crate::{backend::Backend, core::{primitives::TensorValue, tensor::TensorError}};
+use crate::{backend::{Backend, BackendUnary}, core::{tensor::TensorError, value::{TensorValue, TensorValueUnary}}, ops::elementwise::UnaryTensorOp};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Cpu;
@@ -47,21 +47,25 @@ impl<T: TensorValue> Backend<T> for Cpu {
     fn new() -> Self {
         Self
     }
-    
-    fn apply_each<F>(&self, buf: &mut Self::Buf, f: F, offsets: impl Iterator<Item = usize>) -> Result<(), TensorError>
-    where
-        F: Fn(T) -> T {
-        for offset in offsets {
-            let value = self.read(buf, offset)?;
-            let new_value = f(value);
-            self.write(buf, offset, new_value)?;
-        }
-        Ok(())
-    }
-    
+
     fn copy(&self, src: &Self::Buf) -> Result<Self::Buf, TensorError> {
         let mut dst = self.alloc(src.len())?;
         dst.copy_from_slice(src);
         Ok(dst)
+    }
+    
+    fn dump(&self, src: &Self::Buf) -> Result<Box<[T]>, TensorError> {
+        Ok(src.clone())
+    }
+}
+
+impl<T: TensorValue + TensorValueUnary> BackendUnary<T> for Cpu {
+    fn apply_unary(&self, buf: &mut Self::Buf, op: UnaryTensorOp<T>, offsets: Vec<usize>) -> Result<(), TensorError> {
+        for offset in offsets {
+            let value = self.read(buf, offset)?;
+            let new_value = op.apply(value);
+            self.write(buf, offset, new_value)?;
+        }
+        Ok(())
     }
 }

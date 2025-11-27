@@ -1,12 +1,13 @@
 use std::marker::PhantomData;
 
+#[cfg(feature = "cuda")]
+use cudarc::driver::DeviceRepr;
+
 use crate::backend::Backend;
 use crate::backend::cpu::Cpu;
+use crate::core::value::TensorValue;
 use crate::core::{shape_to_stride, Shape, MetaTensor};
 use crate::core::tensor::TensorError;
-
-pub trait TensorValue: Copy + Default {}
-impl<T: Copy + Default> TensorValue for T {}
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct TensorBase<B: Backend<T>, T: TensorValue> {
@@ -38,6 +39,28 @@ pub type CpuTensor<T> = TensorBase<Cpu, T>;
 
 #[cfg(feature = "cuda")]
 pub type CudaTensor<T> = TensorBase<crate::backend::cuda::CudaBackend, T>;
+
+#[cfg(feature = "cuda")]
+impl<T: TensorValue + DeviceRepr> CudaTensor<T> {
+    /// Transfers this tensor from the CUDA backend to a CPU tensor.
+    pub fn cpu(&self) -> Result<CpuTensor<T>, TensorError> {
+        let cpu_backend = Cpu;
+        let cpu_buffer = self.backend.dump(&self.raw)?;
+        let cpu = CpuTensor::from_parts(cpu_backend, cpu_buffer, self.meta.clone());
+        Ok(cpu)
+    }
+}
+
+#[cfg(feature = "cuda")]
+impl<T: TensorValue + DeviceRepr> CpuTensor<T> {
+    /// Transfers this tensor from the CPU backend to a CUDA tensor.
+    pub fn cuda(&self) -> Result<CudaTensor<T>, TensorError> {
+        let cuda_backend = crate::backend::cuda::CudaBackend::construct(0)?;
+        let cuda_buffer = cuda_backend.from_slice(self.backend.dump(&self.raw)?)?;
+        let cuda = CudaTensor::from_parts(cuda_backend, cuda_buffer, self.meta.clone());
+        Ok(cuda)
+    }
+}
 
 /// A non-owning view over tensor data with explicit layout metadata.
 ///

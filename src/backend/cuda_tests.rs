@@ -85,7 +85,7 @@ pub fn example_add() -> Result<Vec<f32>, TensorError> {
 #[cfg(feature = "cuda")]
 mod tests {
     use super::*;
-    use crate::core::{primitives::{CudaTensor, TensorValue}, tensor::{AsView, AsViewMut, TensorAccess, TensorAccessMut, TensorError}, idx::Idx, Shape};
+    use crate::core::{idx::Idx, primitives::CudaTensor, tensor::{AsView, AsViewMut, TensorAccess, TensorAccessMut, TensorError}, value::TensorValue, Shape};
     
     fn make_cuda_tensor<T: TensorValue + cudarc::driver::DeviceRepr>(buf: Vec<T>, shape: Shape) -> CudaTensor<T> {
         CudaTensor::from_buf(buf, shape).unwrap()

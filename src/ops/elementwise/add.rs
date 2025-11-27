@@ -1,24 +1,24 @@
 use std::{borrow::Borrow, ops::{Add, AddAssign}};
 
-use crate::{backend::Backend, core::{primitives::{TensorBase, TensorValue}, tensor::{AsTensor, AsViewMut}, TensorView, TensorViewMut}};
+use crate::{backend::{Backend, BackendUnary}, core::{primitives::TensorBase, tensor::{AsTensor, AsViewMut}, value::{TensorValue, TensorValueUnary}, TensorView, TensorViewMut}, ops::elementwise::UnaryTensorOp};
 
 impl<'a, T, B, O> AddAssign<O> for TensorViewMut<'a, T, B> 
-    where T: std::ops::Add<Output = T> + TensorValue,
-          B: Backend<T>,
+    where T: TensorValueUnary + TensorValue,
+          B: BackendUnary<T>,
           O: Borrow<T>
 {
     fn add_assign(&mut self, rhs: O) {
-        self.backend.apply_each(
+        self.backend.apply_unary(
             self.raw, 
-            |x| x + *rhs.borrow(),
-            self.meta.iter_offsets()
+            UnaryTensorOp::Add(*rhs.borrow()),
+            self.meta.offsets()
         ).unwrap();
     }
 }
 
 impl<'a, T, B, O> Add<O> for TensorViewMut<'a, T, B> 
-    where T: std::ops::Add<Output = T> + TensorValue,
-          B: Backend<T>,
+    where T: TensorValueUnary  + TensorValue,
+          B: BackendUnary<T>,
           O: Borrow<T>
 {
     type Output = TensorBase<B, T>;
@@ -32,8 +32,8 @@ impl<'a, T, B, O> Add<O> for TensorViewMut<'a, T, B>
 }
 
 impl<'a, T, B, O> Add<O> for TensorView<'a, T, B> 
-    where T: std::ops::Add<Output = T> + TensorValue,
-          B: Backend<T>,
+    where T: TensorValueUnary  + TensorValue,
+          B: BackendUnary<T>,
           O: Borrow<T>
 {
     type Output = TensorBase<B, T>;

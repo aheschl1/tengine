@@ -1,5 +1,5 @@
 
-use crate::core::{primitives::TensorValue, tensor::TensorError};
+use crate::{core::{tensor::TensorError, value::{TensorValue, TensorValueUnary}}, ops::elementwise::UnaryTensorOp};
 
 pub mod cpu;
 
@@ -18,10 +18,12 @@ pub trait Backend<T: TensorValue> {
     fn write(&self, buf: &mut Self::Buf, offset: usize, value: T) -> Result<(), TensorError>;
     fn len(&self, buf: &Self::Buf) -> usize;
     fn copy(&self, src: &Self::Buf) -> Result<Self::Buf, TensorError>;
+    fn dump(&self, src: &Self::Buf) -> Result<Box<[T]>, TensorError>;
 
-    fn apply_each<F>(&self, buf: &mut Self::Buf, f: F, offsets: impl Iterator<Item = usize>) -> Result<(), TensorError>
-    where
-        F: Fn(T) -> T;
-    
+    // fn apply_unary(&self, buf: &mut Self::Buf, op: UnaryTensorOp<T>, offsets: Vec<usize>) -> Result<(), TensorError>    
     fn new() -> Self;
+}
+
+pub trait BackendUnary<T: TensorValue + TensorValueUnary>: Backend<T> {
+    fn apply_unary(&self, buf: &mut Self::Buf, op: UnaryTensorOp<T>, offsets: Vec<usize>) -> Result<(), TensorError>;
 }

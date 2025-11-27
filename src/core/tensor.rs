@@ -1,5 +1,5 @@
 
-use crate::{backend::Backend, core::{idx::Idx, primitives::{TensorBase, TensorValue}, Dim, MetaTensor, Shape, Stride, TensorView, TensorViewMut}};
+use crate::{backend::Backend, core::{idx::Idx, primitives::TensorBase, value::TensorValue, Dim, MetaTensor, Shape, Stride, TensorView, TensorViewMut}};
 use thiserror::Error;
 
 #[derive(Debug, Error, PartialEq, Eq, Clone)]

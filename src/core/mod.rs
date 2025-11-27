@@ -3,6 +3,7 @@ pub mod primitives;
 pub mod meta;
 pub mod tensor;
 pub mod idx;
+pub mod value;
 
 pub use meta::{Dim, Shape, Stride, MetaTensor, MetaTensorView, shape_to_stride};
 pub use primitives::{CpuTensor, TensorView, CpuTensorView, TensorViewMut};
@@ -10,7 +11,7 @@ pub use primitives::{CpuTensor, TensorView, CpuTensorView, TensorViewMut};
 
 #[cfg(test)]
 mod tests {
-    use crate::{backend::Backend, core::{idx::Idx, primitives::TensorValue, tensor::{AsTensor, AsView, AsViewMut, TensorAccess, TensorAccessMut, TensorError}, CpuTensor, MetaTensor, MetaTensorView, Shape, Stride}};
+    use crate::{backend::Backend, core::{idx::Idx, value::TensorValue, tensor::{AsTensor, AsView, AsViewMut, TensorAccess, TensorAccessMut, TensorError}, CpuTensor, MetaTensor, MetaTensorView, Shape, Stride}};
 
     fn make_tensor<T: TensorValue>(buf: Vec<T>, shape: Shape) -> CpuTensor<T> {
         CpuTensor::from_buf(buf, shape).unwrap()
