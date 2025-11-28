@@ -54,7 +54,7 @@ impl CudaBackend {
 impl<T: TensorValue + DeviceRepr> Backend<T> for CudaBackend {
     type Buf = CudaBuf<T>;
     
-    fn from_slice(&self, src: Box<[T]>) -> Result<Self::Buf, crate::core::tensor::TensorError> {
+    fn alloc_from_slice(&self, src: Box<[T]>) -> Result<Self::Buf, crate::core::tensor::TensorError> {
         let ptr = self.stream()
             .clone_htod(src.as_ref())
             .map_err(|e| TensorError::CudaError(e.to_string()))?;

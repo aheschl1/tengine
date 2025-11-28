@@ -37,7 +37,7 @@ impl<T: TensorValue> Backend<T> for Cpu {
         }
     }
     
-    fn from_slice(&self, src: Box<[T]>) -> Result<Self::Buf, TensorError> {
+    fn alloc_from_slice(&self, src: Box<[T]>) -> Result<Self::Buf, TensorError> {
         Ok(src)
     }
     

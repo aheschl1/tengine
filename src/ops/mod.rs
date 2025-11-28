@@ -1109,4 +1109,392 @@ mod cuda_tests {
             speedup
         );
     }
+
+    // Additional comprehensive CUDA tests for edge cases and data types
+    
+    #[test]
+    fn test_cuda_f64_operations() {
+        let mut tensor = CudaTensor::<f64>::from_buf(vec![1.5, 2.5, 3.5, 4.5], vec![4]).unwrap();
+        let mut view = tensor.view_mut();
+        view += 10.25;
+        view *= 2.0;
+        view -= 3.5;
+        
+        let expected = CpuTensor::<f64>::from_buf(
+            vec![20.0, 22.0, 24.0, 26.0], 
+            vec![4]
+        ).unwrap();
+        
+        let result = tensor.cpu().unwrap();
+        for i in 0..4 {
+            let val = result.view().get(vec![i]).unwrap();
+            let exp = expected.view().get(vec![i]).unwrap();
+            assert!((val - exp).abs() < 1e-10, "Mismatch at {}: {} vs {}", i, val, exp);
+        }
+    }
+
+    #[test]
+    fn test_cuda_i64_operations() {
+        let mut tensor = CudaTensor::<i64>::from_buf(
+            vec![100, 200, 300, 400, 500], 
+            vec![5]
+        ).unwrap();
+        let mut view = tensor.view_mut();
+        view -= 50;
+        view *= 3;
+        
+        let expected = CpuTensor::<i64>::from_buf(
+            vec![150, 450, 750, 1050, 1350], 
+            vec![5]
+        ).unwrap();
+        assert_eq!(tensor.cpu().unwrap(), expected);
+    }
+
+    #[test]
+    fn test_cuda_u32_operations() {
+        let mut tensor = CudaTensor::<u32>::from_buf(
+            vec![10, 20, 30, 40], 
+            vec![4]
+        ).unwrap();
+        let mut view = tensor.view_mut();
+        view += 5;
+        view *= 2;
+        
+        let expected = CpuTensor::<u32>::from_buf(
+            vec![30, 50, 70, 90], 
+            vec![4]
+        ).unwrap();
+        assert_eq!(tensor.cpu().unwrap(), expected);
+    }
+
+    #[test]
+    fn test_cuda_i16_operations() {
+        let mut tensor = CudaTensor::<i16>::from_buf(
+            vec![1, 2, 3, 4, 5, 6], 
+            vec![2, 3]
+        ).unwrap();
+        let mut view = tensor.view_mut();
+        view *= 10;
+        view += 5;
+        
+        let expected = CpuTensor::<i16>::from_buf(
+            vec![15, 25, 35, 45, 55, 65], 
+            vec![2, 3]
+        ).unwrap();
+        assert_eq!(tensor.cpu().unwrap(), expected);
+    }
+
+    #[test]
+    fn test_cuda_chained_operations_complex() {
+        let mut tensor = CudaTensor::<f32>::from_buf(
+            vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], 
+            vec![2, 2, 2]
+        ).unwrap();
+        
+        // Complex chain: multiply, add, subtract, multiply again
+        let mut view = tensor.view_mut();
+        view *= 2.0;
+        view += 10.0;
+        view -= 5.0;
+        view *= 0.5;
+        
+        // Expected: ((x * 2 + 10) - 5) * 0.5 = (x * 2 + 5) * 0.5 = x + 2.5
+        let expected = CpuTensor::<f32>::from_buf(
+            vec![3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5], 
+            vec![2, 2, 2]
+        ).unwrap();
+        
+        let result = tensor.cpu().unwrap();
+        for i in 0..8 {
+            let idx = vec![i / 4, (i / 2) % 2, i % 2];
+            let val = result.view().get(idx.clone()).unwrap();
+            let exp = expected.view().get(idx.clone()).unwrap();
+            assert!((val - exp).abs() < 1e-5, "Mismatch at {:?}: {} vs {}", idx, val, exp);
+        }
+    }
+
+    #[test]
+    fn test_cuda_zero_operations() {
+        let mut tensor = CudaTensor::<i32>::from_buf(vec![5, 10, 15, 20], vec![4]).unwrap();
+        let mut view = tensor.view_mut();
+        view += 0;
+        view *= 1;
+        view -= 0;
+        
+        let expected = CpuTensor::<i32>::from_buf(vec![5, 10, 15, 20], vec![4]).unwrap();
+        assert_eq!(tensor.cpu().unwrap(), expected);
+    }
+
+    #[test]
+    fn test_cuda_multiply_by_zero() {
+        let mut tensor = CudaTensor::<i32>::from_buf(
+            vec![100, 200, 300, 400], 
+            vec![4]
+        ).unwrap();
+        let mut view = tensor.view_mut();
+        view *= 0;
+        
+        let expected = CpuTensor::<i32>::from_buf(vec![0, 0, 0, 0], vec![4]).unwrap();
+        assert_eq!(tensor.cpu().unwrap(), expected);
+    }
+
+    #[test]
+    fn test_cuda_very_small_tensor() {
+        // Single element tensor
+        let mut tensor = CudaTensor::<f32>::from_buf(vec![42.0], vec![1]).unwrap();
+        let mut view = tensor.view_mut();
+        view *= 2.0;
+        view += 8.0;
+        
+        let expected = CpuTensor::<f32>::from_buf(vec![92.0], vec![1]).unwrap();
+        assert_eq!(tensor.cpu().unwrap(), expected);
+    }
+
+    #[test]
+    fn test_cuda_4d_tensor() {
+        // 2x2x2x2 tensor
+        let data: Vec<i32> = (1..=16).collect();
+        let mut tensor = CudaTensor::<i32>::from_buf(data, vec![2, 2, 2, 2]).unwrap();
+        let mut view = tensor.view_mut();
+        view += 100;
+        
+        let expected_data: Vec<i32> = (101..=116).collect();
+        let expected = CpuTensor::<i32>::from_buf(expected_data, vec![2, 2, 2, 2]).unwrap();
+        assert_eq!(tensor.cpu().unwrap(), expected);
+    }
+
+    #[test]
+    fn test_cuda_mixed_operations_on_slice() {
+        let mut tensor = CudaTensor::<f32>::from_buf(
+            vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0], 
+            vec![3, 3]
+        ).unwrap();
+        
+        let mut view = tensor.view_mut();
+        let mut middle_row = view.slice_mut(0, 1).unwrap(); // [4, 5, 6]
+        middle_row *= 10.0;
+        middle_row += 5.0;
+        
+        let expected = CpuTensor::<f32>::from_buf(
+            vec![1.0, 2.0, 3.0, 45.0, 55.0, 65.0, 7.0, 8.0, 9.0], 
+            vec![3, 3]
+        ).unwrap();
+        assert_eq!(tensor.cpu().unwrap(), expected);
+    }
+
+    #[test]
+    fn test_cuda_alternating_operations() {
+        let mut tensor = CudaTensor::<i32>::from_buf(vec![10, 20, 30, 40], vec![4]).unwrap();
+        let mut view = tensor.view_mut();
+        
+        // Alternating pattern
+        view += 5;   // [15, 25, 35, 45]
+        view *= 2;   // [30, 50, 70, 90]
+        view -= 10;  // [20, 40, 60, 80]
+        view *= 3;   // [60, 120, 180, 240]
+        view += 10;  // [70, 130, 190, 250]
+        
+        let expected = CpuTensor::<i32>::from_buf(
+            vec![70, 130, 190, 250], 
+            vec![4]
+        ).unwrap();
+        assert_eq!(tensor.cpu().unwrap(), expected);
+    }
+
+    #[test]
+    fn test_cuda_reshaped_operations() {
+        let mut tensor = CudaTensor::<f32>::from_buf(
+            vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], 
+            vec![6]
+        ).unwrap();
+        let view = tensor.view_mut();
+        let mut reshaped = view.view_as(vec![2, 3]).unwrap();
+        reshaped *= 5.0;
+        
+        let expected = CpuTensor::<f32>::from_buf(
+            vec![5.0, 10.0, 15.0, 20.0, 25.0, 30.0], 
+            vec![6]
+        ).unwrap();
+        assert_eq!(tensor.cpu().unwrap(), expected);
+    }
+
+    #[test]
+    fn test_cuda_non_inplace_multiple_results() {
+        let mut tensor = CudaTensor::<i32>::from_buf(vec![1, 2, 3, 4], vec![4]).unwrap();
+        let view = tensor.view_mut();
+        
+        // Create multiple independent results
+        let result1 = view + 10;
+        let view2 = tensor.view_mut();
+        let result2 = view2 * 5;
+        let view3 = tensor.view_mut();
+        let result3 = view3 - 1;
+        
+        let expected1 = CpuTensor::<i32>::from_buf(vec![11, 12, 13, 14], vec![4]).unwrap();
+        let expected2 = CpuTensor::<i32>::from_buf(vec![5, 10, 15, 20], vec![4]).unwrap();
+        let expected3 = CpuTensor::<i32>::from_buf(vec![0, 1, 2, 3], vec![4]).unwrap();
+        
+        assert_eq!(result1.cpu().unwrap(), expected1);
+        assert_eq!(result2.cpu().unwrap(), expected2);
+        assert_eq!(result3.cpu().unwrap(), expected3);
+        
+        // Original unchanged
+        let expected_original = CpuTensor::<i32>::from_buf(vec![1, 2, 3, 4], vec![4]).unwrap();
+        assert_eq!(tensor.cpu().unwrap(), expected_original);
+    }
+
+    #[test]
+    fn test_cuda_scalar_edge_cases() {
+        // Test with actual scalar (0-dimensional tensor)
+        let mut tensor = CudaTensor::<f32>::from_buf(vec![3.14159], vec![]).unwrap();
+        assert!(tensor.is_scalar());
+        
+        let mut view = tensor.view_mut();
+        view *= 2.0;
+        view += 1.0;
+        
+        let result = tensor.cpu().unwrap();
+        let value = result.view().get(vec![]).unwrap();
+        assert!((value - 7.28318).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_cuda_negative_to_positive() {
+        let mut tensor = CudaTensor::<i32>::from_buf(
+            vec![-10, -20, -30, -40], 
+            vec![4]
+        ).unwrap();
+        let mut view = tensor.view_mut();
+        view *= -1;
+        view += 5;
+        
+        let expected = CpuTensor::<i32>::from_buf(vec![15, 25, 35, 45], vec![4]).unwrap();
+        assert_eq!(tensor.cpu().unwrap(), expected);
+    }
+
+    #[test]
+    fn test_cuda_large_values_i32() {
+        let mut tensor = CudaTensor::<i32>::from_buf(
+            vec![1_000_000, 2_000_000, 3_000_000], 
+            vec![3]
+        ).unwrap();
+        let mut view = tensor.view_mut();
+        view += 1_000_000;
+        view -= 500_000;
+        
+        let expected = CpuTensor::<i32>::from_buf(
+            vec![1_500_000, 2_500_000, 3_500_000], 
+            vec![3]
+        ).unwrap();
+        assert_eq!(tensor.cpu().unwrap(), expected);
+    }
+
+    #[test]
+    fn test_cuda_fractional_multiplication() {
+        let mut tensor = CudaTensor::<f32>::from_buf(
+            vec![10.0, 20.0, 30.0, 40.0], 
+            vec![4]
+        ).unwrap();
+        let mut view = tensor.view_mut();
+        view *= 0.5;
+        view *= 0.25;
+        
+        let expected = CpuTensor::<f32>::from_buf(
+            vec![1.25, 2.5, 3.75, 5.0], 
+            vec![4]
+        ).unwrap();
+        
+        let result = tensor.cpu().unwrap();
+        for i in 0..4 {
+            let val = result.view().get(vec![i]).unwrap();
+            let exp = expected.view().get(vec![i]).unwrap();
+            assert!((val - exp).abs() < 1e-5);
+        }
+    }
+
+    #[test]
+    fn test_cuda_column_slice_multiple_ops() {
+        let mut tensor = CudaTensor::<i32>::from_buf(
+            vec![1, 2, 3, 4, 5, 6, 7, 8, 9], 
+            vec![3, 3]
+        ).unwrap();
+        let mut view = tensor.view_mut();
+        let mut col = view.slice_mut(1, 1).unwrap(); // Middle column [2, 5, 8]
+        
+        col += 100;
+        col *= 2;
+        
+        let expected = CpuTensor::<i32>::from_buf(
+            vec![1, 204, 3, 4, 210, 6, 7, 216, 9], 
+            vec![3, 3]
+        ).unwrap();
+        assert_eq!(tensor.cpu().unwrap(), expected);
+    }
+
+    #[test]
+    fn test_cuda_3d_depth_slice_operations() {
+        let data: Vec<f32> = (1..=27).map(|x| x as f32).collect();
+        let mut tensor = CudaTensor::<f32>::from_buf(
+            data, 
+            vec![3, 3, 3]
+        ).unwrap();
+        
+        let mut view = tensor.view_mut();
+        let mut depth_slice = view.slice_mut(0, 1).unwrap(); // Middle depth slice
+        depth_slice *= 10.0;
+        
+        let mut expected_data: Vec<f32> = (1..=27).map(|x| x as f32).collect();
+        // Middle depth is indices 9-17 (0-indexed)
+        for i in 9..18 {
+            expected_data[i] *= 10.0;
+        }
+        
+        let expected = CpuTensor::<f32>::from_buf(expected_data, vec![3, 3, 3]).unwrap();
+        assert_eq!(tensor.cpu().unwrap(), expected);
+    }
+
+    #[test]
+    fn test_cuda_ref_value_consistency() {
+        // Test that ref and non-ref operations produce same results
+        let data = vec![5, 10, 15, 20, 25];
+        
+        let mut tensor1 = CudaTensor::<i32>::from_buf(data.clone(), vec![5]).unwrap();
+        let mut tensor2 = CudaTensor::<i32>::from_buf(data, vec![5]).unwrap();
+        
+        let value = 7;
+        let mut view1 = tensor1.view_mut();
+        view1 += value;  // Using owned value
+        
+        let mut view2 = tensor2.view_mut();
+        view2 += &value;  // Using reference
+        
+        assert_eq!(tensor1.cpu().unwrap(), tensor2.cpu().unwrap());
+    }
+
+    #[test]
+    fn test_cuda_immutable_view_complex_chain() {
+        let tensor = CudaTensor::<f32>::from_buf(
+            vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], 
+            vec![2, 4]
+        ).unwrap();
+        
+        // Complex immutable chain
+        let result = tensor.view()
+            .slice(0, 1).unwrap()  // Second row: [5, 6, 7, 8]
+            .view_as(vec![2, 2]).unwrap()  // Reshape
+            + 100.0;
+        
+        let expected = CpuTensor::<f32>::from_buf(
+            vec![105.0, 106.0, 107.0, 108.0], 
+            vec![2, 2]
+        ).unwrap();
+        assert_eq!(result.cpu().unwrap(), expected);
+        
+        // Original unchanged
+        let original_expected = CpuTensor::<f32>::from_buf(
+            vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], 
+            vec![2, 4]
+        ).unwrap();
+        assert_eq!(tensor.cpu().unwrap(), original_expected);
+    }
 }

@@ -56,7 +56,7 @@ impl<T: TensorValue + DeviceRepr> CpuTensor<T> {
     /// Transfers this tensor from the CPU backend to a CUDA tensor.
     pub fn cuda(&self) -> Result<CudaTensor<T>, TensorError> {
         let cuda_backend = crate::backend::cuda::CudaBackend::construct(0)?;
-        let cuda_buffer = cuda_backend.from_slice(self.backend.dump(&self.raw)?)?;
+        let cuda_buffer = cuda_backend.alloc_from_slice(self.backend.dump(&self.raw)?)?;
         let cuda = CudaTensor::from_parts(cuda_backend, cuda_buffer, self.meta.clone());
         Ok(cuda)
     }
@@ -196,7 +196,7 @@ where
     /// - `InvalidShape` if element count doesn't match.
     pub fn from_buf(raw: impl Into<Box<[T]>>, shape: Shape) -> Result<Self, TensorError> {
         let backend = B::new();
-        let buffer = backend.from_slice(raw.into())?;
+        let buffer = backend.alloc_from_slice(raw.into())?;
         if shape.iter().product::<usize>() != backend.len(&buffer) {
             return Err(TensorError::InvalidShape);
         }
