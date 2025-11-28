@@ -6,7 +6,12 @@ use cudarc::{driver::{CudaContext, LaunchConfig, PushKernelArg}, nvrtc::Ptx};
 
 use crate::core::tensor::TensorError;
 
-include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+// ignore styling for generated code
+#[allow(non_camel_case_types)]
+mod bindings{
+    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+}
+
 const ADD_KERNEL_PTX: &str = include_str!(concat!(env!("OUT_DIR"), "/add.ptx"));
 
 pub struct CudaBackend {

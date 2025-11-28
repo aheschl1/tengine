@@ -5,7 +5,12 @@ use cudarc::driver::{CudaContext, CudaSlice, DevicePtr, DeviceRepr};
 use crate::{backend::{Backend, BackendElementwise}, core::{tensor::TensorError, value::{TensorValue, TensorValueElementwise}}, ops::elementwise::ElementwiseTensorOp};
 
 // Include bindgen-generated FFI declarations for CUDA kernel launchers
-include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+#[allow(non_camel_case_types)]
+mod bindings{
+    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+}
+
+use bindings::*;
 
 // Can be tuned based on kernel characteristics and GPU architecture
 const DEFAULT_BLOCK_SIZE: u32 = 256;
