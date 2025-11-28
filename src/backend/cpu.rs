@@ -68,8 +68,8 @@ impl<T: TensorValue + TensorValueElementwise> BackendElementwise<T> for Cpu {
         len: usize
     ) -> Result<(), TensorError> {
         let bufptr = buf.as_mut();
-        for i in start..(start + len) {
-            bufptr[i] = op.apply(bufptr[i]);
+        for item in bufptr.iter_mut().skip(start).take(len) {
+            *item = op.apply(*item);
         }
         Ok(())
     }
