@@ -2,7 +2,7 @@ use std::sync::{atomic::{AtomicBool, Ordering}, Arc, LazyLock, Mutex};
 
 use cudarc::driver::{CudaContext, CudaSlice, DevicePtr, DeviceRepr};
 
-use crate::{backend::{Backend, BackendUnaryElementwise}, core::{tensor::TensorError, value::{TensorValue, TensorValueElementwise}}, ops::unary::ElementwiseTensorOp};
+use crate::{backend::{Backend, BackendUnaryElementwise}, core::{meta::TensorOffsetIterator, tensor::TensorError, value::{TensorValue, TensorValueElementwise}}, ops::unary::ElementwiseTensorOp};
 
 // Include bindgen-generated FFI declarations for CUDA kernel launchers
 #[allow(non_camel_case_types)]
@@ -226,7 +226,7 @@ impl<T: TensorValueElementwise + DeviceRepr + 'static> BackendUnaryElementwise<T
         }
     }
     
-    fn apply_elementwise_strided(
+    fn apply_elementwise_1d_strided(
         &self, buf: &mut Self::Buf, 
         op: &ElementwiseTensorOp<T>, 
         start: usize,
@@ -278,59 +278,65 @@ impl<T: TensorValueElementwise + DeviceRepr + 'static> BackendUnaryElementwise<T
         }
     }
     
-    // fn apply_elementwise_scattered(
-    //     &self, buf: &mut Self::Buf, 
-    //     op: &ElementwiseTensorOp<T>, 
-    //     offsets: &[usize]
-    // ) -> Result<(), TensorError> {
-    //     // Upload offsets to device
-    //     let offsets_ptr_device = self.stream()
-    //         .clone_htod(offsets)
-    //         .map_err(|e| TensorError::CudaError(e.to_string()))?;
+    fn apply_elementwise_nd(
+        &self,
+        buf: &mut Self::Buf,
+        op: &ElementwiseTensorOp<T>,
+        offset: usize,
+        shape: &[usize],
+        stride: &[isize],
+    ) -> Result<(), TensorError> {
+        let op_code = op.to_op_code();
+        let value = op.value();
+        let stream = self.stream();
+        let rank = shape.len();
+        let size = shape.iter().product::<usize>();
+        // we need ptr to stridde and shape
+        let shape_buf = self.alloc_from_slice(shape.to_vec().into_boxed_slice())?;
+        let stride_buf = self.alloc_from_slice(stride.to_vec().into_boxed_slice())?;
 
-    //     let op_code = op.to_op_code();
-    //     let value = op.value();
-    //     let n = offsets.len();
-    //     let stream = self.stream();
+        let (stride_ptr, _) = stride_buf.ptr.device_ptr(&stream);
+        let (shape_ptr, _) = shape_buf.ptr.device_ptr(&stream);
 
-    //     macro_rules! launch_elementwise {
-    //         ($launch_fn:ident, $t:ty) => {{
-    //             // transmute value from T to actual type
-    //             let concrete_value: $t = unsafe { std::mem::transmute_copy(&value) };
-    //             let (data_ptr, _) = buf.ptr.device_ptr(&stream);
-    //             let (offsets_ptr, _) = offsets_ptr_device.device_ptr(&stream);
+        macro_rules! launch_elementwise {
+            ($launch_fn:ident, $t:ty) => {{
+                // transmute value from T to actual type
+                let concrete_value: $t = unsafe { std::mem::transmute_copy(&value) };
+                let (data_ptr, _) = buf.ptr.device_ptr(&stream);
                 
-    //             unsafe {
-    //                 $launch_fn(
-    //                     data_ptr as *mut $t,
-    //                     offsets_ptr as *mut usize,
-    //                     n,
-    //                     op_code,
-    //                     concrete_value,
-    //                     DEFAULT_BLOCK_SIZE,
-    //                 );
-    //             }
-    //             self.dirty();
-    //             Ok(())
-    //         }};
-    //     }
+                unsafe {
+                    $launch_fn(
+                        data_ptr as *mut $t,
+                        offset,
+                        stride_ptr as *const isize,
+                        shape_ptr as *const usize,
+                        rank,
+                        size,
+                        op_code,
+                        concrete_value,
+                        DEFAULT_BLOCK_SIZE,
+                    );
+                }
+                self.dirty();
+                Ok(())
+            }};
+        }
 
-    //     // Dispatch based on type
-    //     match std::any::TypeId::of::<T>() {
-    //         id if id == std::any::TypeId::of::<f32>() => launch_elementwise!(launch_elementwise_scattered_f32, f32),
-    //         id if id == std::any::TypeId::of::<f64>() => launch_elementwise!(launch_elementwise_scattered_f64, f64),
-    //         id if id == std::any::TypeId::of::<u8>() => launch_elementwise!(launch_elementwise_scattered_u8, u8),
-    //         id if id == std::any::TypeId::of::<u16>() => launch_elementwise!(launch_elementwise_scattered_u16, u16),
-    //         id if id == std::any::TypeId::of::<u32>() => launch_elementwise!(launch_elementwise_scattered_u32, u32),
-    //         id if id == std::any::TypeId::of::<u64>() => launch_elementwise!(launch_elementwise_scattered_u64, u64),
-    //         id if id == std::any::TypeId::of::<u128>() => launch_elementwise!(launch_elementwise_scattered_u128, u128),
-    //         id if id == std::any::TypeId::of::<i8>() => launch_elementwise!(launch_elementwise_scattered_i8, i8),
-    //         id if id == std::any::TypeId::of::<i16>() => launch_elementwise!(launch_elementwise_scattered_i16, i16),
-    //         id if id == std::any::TypeId::of::<i32>() => launch_elementwise!(launch_elementwise_scattered_i32, i32),
-    //         id if id == std::any::TypeId::of::<i64>() => launch_elementwise!(launch_elementwise_scattered_i64, i64),
-    //         id if id == std::any::TypeId::of::<i128>() => launch_elementwise!(launch_elementwise_scattered_i128, i128),
-    //         _ => Err(TensorError::CudaError("Unsupported type for CUDA elementwise operation".to_string())),
-    //     }
-    // }
+        match std::any::TypeId::of::<T>() {
+            id if id == std::any::TypeId::of::<f32>() => launch_elementwise!(launch_elementwise_nd_affine_f32, f32),
+            id if id == std::any::TypeId::of::<f64>() => launch_elementwise!(launch_elementwise_nd_affine_f64, f64),
+            id if id == std::any::TypeId::of::<u8>() => launch_elementwise!(launch_elementwise_nd_affine_u8, u8),
+            id if id == std::any::TypeId::of::<u16>() => launch_elementwise!(launch_elementwise_nd_affine_u16, u16),
+            id if id == std::any::TypeId::of::<u32>() => launch_elementwise!(launch_elementwise_nd_affine_u32, u32),
+            id if id == std::any::TypeId::of::<u64>() => launch_elementwise!(launch_elementwise_nd_affine_u64, u64),
+            id if id == std::any::TypeId::of::<u128>() => launch_elementwise!(launch_elementwise_nd_affine_u128, u128),
+            id if id == std::any::TypeId::of::<i8>() => launch_elementwise!(launch_elementwise_nd_affine_i8, i8),
+            id if id == std::any::TypeId::of::<i16>() => launch_elementwise!(launch_elementwise_nd_affine_i16, i16),
+            id if id == std::any::TypeId::of::<i32>() => launch_elementwise!(launch_elementwise_nd_affine_i32, i32),
+            id if id == std::any::TypeId::of::<i64>() => launch_elementwise!(launch_elementwise_nd_affine_i64, i64),
+            id if id == std::any::TypeId::of::<i128>() => launch_elementwise!(launch_elementwise_nd_affine_i128, i128),
+            _ => Err(TensorError::CudaError("Unsupported type for CUDA elementwise operation".to_string())),
+        }
+    }
 
 }

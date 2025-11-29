@@ -1,5 +1,5 @@
 
-use crate::{backend::{Backend, BackendBinaryElementwise, BackendUnaryElementwise}, core::{tensor::TensorError, value::{TensorValue, TensorValueElementwise}}, ops::unary::ElementwiseTensorOp};
+use crate::{backend::{Backend, BackendUnaryElementwise}, core::{meta::TensorOffsetIterator, tensor::TensorError, value::{TensorValue, TensorValueElementwise}}, ops::unary::ElementwiseTensorOp};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Cpu;
@@ -74,46 +74,53 @@ impl<T: TensorValue + TensorValueElementwise> BackendUnaryElementwise<T> for Cpu
         Ok(())
     }
     
-    fn apply_elementwise_strided(
+    fn apply_elementwise_1d_strided(
         &self, buf: &mut Self::Buf, 
         op: &ElementwiseTensorOp<T>, 
-        start: usize,
+        offset: usize,
         stride: isize,
         len: usize
     ) -> Result<(), TensorError> {
-
         let bufptr = buf.as_mut();
-        let mut idx = start;
+        let mut idx: isize = offset as isize;
         for _ in 0..len {
-            bufptr[idx] = op.apply(bufptr[idx]);
-            idx = (idx as isize + stride) as usize;
+            bufptr[idx as usize] = op.apply(bufptr[idx as usize]);
+            idx += stride;
         }
         Ok(())
     }
     
-    // fn apply_elementwise_scattered(
-    //     &self, buf: &mut Self::Buf, 
-    //     op: &ElementwiseTensorOp<T>, 
-    //     offsets: &[usize]
-    // ) -> Result<(), TensorError> {
-    //     let bufptr = buf.as_mut();
-    //     for &idx in offsets {
-    //         bufptr[idx] = op.apply(bufptr[idx]);
-    //     }
-    //     Ok(())
-    // }
-}
-
-impl<T> BackendBinaryElementwise<T> for Cpu 
-where T: TensorValue + TensorValueElementwise
-{
-    fn merge(
-        &self, 
-        left: (&Self::Buf, &[crate::core::meta::MemRegion]), 
-        right: (&Self::Buf, &[crate::core::meta::MemRegion]),
-        dst: (&mut Self::Buf, &[crate::core::meta::MemRegion]),
-        op: ElementwiseTensorOp<T>
+    fn apply_elementwise_nd(
+        &self,
+        buf: &mut Self::Buf,
+        op: &ElementwiseTensorOp<T>,
+        offset: usize,
+        shape: &[usize],
+        stride: &[isize],
     ) -> Result<(), TensorError> {
-        todo!()
+        let bufptr = buf.as_mut();
+        let mut iterator = TensorOffsetIterator::new(
+            shape.to_vec(),
+            stride.to_vec(),
+            offset,
+        );
+        while let Some(idx) = iterator.next() {
+            bufptr[idx] = op.apply(bufptr[idx]);
+        }
+        Ok(())
     }
 }
+
+// impl<T> BackendBinaryElementwise<T> for Cpu 
+// where T: TensorValue + TensorValueElementwise
+// {
+//     fn merge(
+//         &self, 
+//         left: (&Self::Buf, &[crate::core::meta::MemRegion]), 
+//         right: (&Self::Buf, &[crate::core::meta::MemRegion]),
+//         dst: (&mut Self::Buf, &[crate::core::meta::MemRegion]),
+//         op: ElementwiseTensorOp<T>
+//     ) -> Result<(), TensorError> {
+//         todo!()
+//     }
+// }

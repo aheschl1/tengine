@@ -11,7 +11,7 @@ impl<'a, T, B, O> MulAssign<O> for TensorViewMut<'a, T, B>
         self.backend.apply_elementwise(
             self.raw, 
             ElementwiseTensorOp::Mul(*rhs.borrow()),
-            self.meta.mem_regions().as_slice()
+            &self.meta
         ).unwrap();
     }
 }

@@ -2,22 +2,7 @@ use std::ops::{Range, RangeBounds, RangeFrom, RangeTo, RangeInclusive, RangeFull
 use super::{Shape, Stride};
 use super::tensor::TensorError;
 
-/// Represents a slice specification with optional start, end, and step.
-/// 
-/// This allows for Python-style slicing including negative steps (reverse iteration).
-/// 
-/// # Examples
-/// 
-/// ```ignore
-/// // Full slice with step -1 (reverse)
-/// let slice = Slice::full().step(-1);
-/// 
-/// // Slice from index 5 to 2 with step -1
-/// let slice = Slice::new(Some(5), Some(2), Some(-1));
-/// 
-/// // Convert from a range
-/// let slice: Slice = (2..8).into();
-/// ```
+
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
 pub struct Slice {
     pub start: Option<usize>,
@@ -26,36 +11,31 @@ pub struct Slice {
 }
 
 impl Slice {
-    /// Creates a new slice with the given start, end, and step.
     pub fn new(start: Option<usize>, end: Option<usize>, step: Option<isize>) -> Self {
         Slice { start, end, step }
     }
 
-    /// Creates a full slice (equivalent to `..` or `:` in Python).
+    /// Creates a full slice (equivalent to `..`).
     pub fn full() -> Self {
         Slice { start: None, end: None, step: None }
     }
 
-    /// Sets the step for this slice (builder pattern).
     pub fn step(mut self, step: isize) -> Self {
         self.step = Some(step);
         self
     }
 
-    /// Sets the start for this slice (builder pattern).
     pub fn start(mut self, start: usize) -> Self {
         self.start = Some(start);
         self
     }
 
-    /// Sets the end for this slice (builder pattern).
     pub fn end(mut self, end: usize) -> Self {
         self.end = Some(end);
         self
     }
 }
 
-// Implement From for standard Range types
 impl From<Range<usize>> for Slice {
     fn from(range: Range<usize>) -> Self {
         // Automatically infer negative step if start > end
@@ -123,7 +103,6 @@ impl From<RangeFull> for Slice {
     }
 }
 
-// Implement From for a single index (creates a slice that selects just that index)
 impl From<usize> for Slice {
     fn from(idx: usize) -> Self {
         Slice {
@@ -134,7 +113,6 @@ impl From<usize> for Slice {
     }
 }
 
-// Implement RangeBounds so Slice can be used where RangeBounds is expected
 impl RangeBounds<usize> for Slice {
     fn start_bound(&self) -> std::ops::Bound<&usize> {
         match &self.start {
