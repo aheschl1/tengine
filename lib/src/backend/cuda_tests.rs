@@ -98,7 +98,7 @@ mod tests {
 
     fn index_tensor<'a, T: TensorValue + PartialEq + std::fmt::Debug + cudarc::driver::DeviceRepr>(
         index: Idx<'a>, 
-        tensor: &'a impl TensorAccess<T, crate::backend::cuda::CudaBackend>
+        tensor: &'a impl TensorAccess<T, crate::backend::cuda::Cuda>
     ) -> Result<T, TensorError> {
         let r: Result<T, TensorError> = tensor.get(&index);
         let a = match r.as_ref() {

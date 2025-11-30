@@ -15,11 +15,11 @@ use bindings::*;
 // Can be tuned based on kernel characteristics and GPU architecture
 const DEFAULT_BLOCK_SIZE: u32 = 256;
 
-const CUDA_BACKENDS: LazyLock<Vec<CudaBackend>> = LazyLock::new(|| {
+const CUDA_BACKENDS: LazyLock<Vec<Cuda>> = LazyLock::new(|| {
     let mut backends = Vec::new();
     let device_count = cudarc::driver::CudaContext::device_count().unwrap_or(0);
     for device_id in 0..device_count {
-        let backend = CudaBackend { 
+        let backend = Cuda { 
             ctx: CudaContext::new(device_id as usize).unwrap(), 
             dirty: AtomicBool::new(false).into(),
         };
@@ -35,13 +35,13 @@ pub struct CudaBuf<T: TensorValue> {
 }
 
 #[derive(Clone)]
-pub struct CudaBackend {
+pub struct Cuda {
     pub(crate) ctx: Arc<CudaContext>,
     dirty: Arc<AtomicBool>,
 }
 
 
-impl CudaBackend {
+impl Cuda {
     fn stream(&self) -> Arc<cudarc::driver::CudaStream> {
         self.ctx.default_stream()
     }
@@ -78,7 +78,7 @@ impl CudaBackend {
     }
 }
 
-impl<T: TensorValue> Backend<T> for CudaBackend {
+impl<T: TensorValue> Backend<T> for Cuda {
     type Buf = CudaBuf<T>;
     
     fn alloc_from_slice(&self, src: Box<[T]>) -> Result<Self::Buf, crate::core::tensor::TensorError> {
@@ -172,7 +172,7 @@ impl<T: TensorValue> Backend<T> for CudaBackend {
     
 }
 
-impl<T: TensorValueElementwise + DeviceRepr> BackendUnaryElementwise<T> for CudaBackend {
+impl<T: TensorValueElementwise + DeviceRepr> BackendUnaryElementwise<T> for Cuda {
     
     fn apply_elementwise_contiguous(
         &self, buf: &mut Self::Buf, 

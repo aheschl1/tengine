@@ -35,7 +35,7 @@ impl<B: Backend<T>, T: TensorValue> Clone for TensorBase<T, B> {
 pub type CpuTensor<T> = TensorBase<T, Cpu>;
 
 #[cfg(feature = "cuda")]
-pub type CudaTensor<T> = TensorBase<T, crate::backend::cuda::CudaBackend>;
+pub type CudaTensor<T> = TensorBase<T, crate::backend::cuda::Cuda>;
 
 #[cfg(feature = "cuda")]
 impl<T: TensorValue> CudaTensor<T> {
@@ -52,7 +52,7 @@ impl<T: TensorValue> CudaTensor<T> {
 impl<T: TensorValue> CpuTensor<T> {
     /// Transfers this tensor from the CPU backend to a CUDA tensor.
     pub fn cuda(&self) -> Result<CudaTensor<T>, TensorError> {
-        let cuda_backend = crate::backend::cuda::CudaBackend::construct(0)?;
+        let cuda_backend = crate::backend::cuda::Cuda::construct(0)?;
         let cuda_buffer = cuda_backend.alloc_from_slice(self.backend.dump(&self.raw)?)?;
         let cuda = CudaTensor::from_parts(cuda_backend, cuda_buffer, self.meta.clone());
         Ok(cuda)
@@ -127,9 +127,9 @@ where
 pub type CpuTensorView<'a, T> = TensorView<'a, T, Cpu>;
 pub type CpuTensorViewMut<'a, T> = TensorViewMut<'a, T, Cpu>;
 #[cfg(feature = "cuda")]
-pub type CudaTensorView<'a, T> = TensorView<'a, T, crate::backend::cuda::CudaBackend>;
+pub type CudaTensorView<'a, T> = TensorView<'a, T, crate::backend::cuda::Cuda>;
 #[cfg(feature = "cuda")]
-pub type CudaTensorViewMut<'a, T> = TensorViewMut<'a, T, crate::backend::cuda::CudaBackend>;
+pub type CudaTensorViewMut<'a, T> = TensorViewMut<'a, T, crate::backend::cuda::Cuda>;
 
 impl<B, T: TensorValue> TensorBase<T, B> 
 where 

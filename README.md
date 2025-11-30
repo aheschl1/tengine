@@ -30,6 +30,35 @@ Goal is high performance ML stack with minimal dependencies and maximal flexibil
 - [X] perf sucks for non-contiguous memory in unary CPU - fix
 - [X] perf sucks for non-contiguous memory in unary CUDA - fix
 
+## Creating Tensors
+
+```rust
+let zeros = TensorBase::<f32, Cpu>::zeros((3, 4)); // 3x4 tensor of zeros
+
+let cpu_ones = CpuTensor::<f32>::ones((2, 2)); // 2x2 tensor of ones
+let gpu_max = CudaTensor::<f32>::max((5, 5)); // 5x5 tensor of maximum f32 values on GPU
+let gpu_min = CudaTensor::<i32>::min((10, 1)); // 10x1 tensor of minimum i32 values on GPU
+
+let cpu_tensor = CpuTensor::<f64>::from_buf(vec![1.0, 2.0, 3.0, 4.0], (2, 2));
+let gpu_tensor = cpu_tensor.cuda();
+
+let buf = vec![0.0f32; 16];
+let tensor = TensorBase::<f32, Cuda>::from_buf(buf, (4, 4));
+
+```
+
+## Arithmetic Operations
+
+```rust
+let mut a = CpuTensor::<f32>::ones((2, 2));
+let view = a.view_mut();
+
+a*= 3.0; 
+a+= 2.0;
+a-= 1.0;
+
+let b: CpuTensor::<f32> = a.view() * 2.0; 
+```
 
 ## Slicing Syntax
 
