@@ -1,13 +1,3 @@
-/// Comprehensive tensor operation benchmarking tool
-/// 
-/// Benchmarks the following operations across various tensor sizes:
-/// - Memory transfer: CPU ↔ GPU
-/// - Elementwise operations: add, subtract, multiply (CPU and GPU)
-/// - Different data types: i32, f32, f64
-/// - Various tensor shapes: 1D, 2D, 3D, large tensors
-/// 
-/// Results are exported to a CSV file for analysis.
-
 use std::time::{Duration, Instant};
 use csv::Writer;
 use serde::Serialize;

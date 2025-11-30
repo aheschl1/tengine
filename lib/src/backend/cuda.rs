@@ -1,4 +1,4 @@
-use std::sync::{atomic::{AtomicBool, Ordering}, Arc, LazyLock, Mutex};
+use std::sync::{atomic::{AtomicBool, Ordering}, Arc, LazyLock};
 
 use cudarc::driver::{CudaContext, CudaSlice, DevicePtr, DeviceRepr};
 

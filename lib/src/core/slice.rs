@@ -189,7 +189,7 @@ pub(crate) fn compute_sliced_parameters(
             0
         } else {
             let dist = (start - end).abs() - 1;
-            (dist as usize / step.abs() as usize) + 1
+            (dist as usize / step.unsigned_abs()) + 1
         }
     };
 

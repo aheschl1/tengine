@@ -69,7 +69,7 @@ pub trait BackendUnaryElementwise<T: TensorValue + TensorValueElementwise>: Back
 
         // worst case because we have to handle full nD striding
         // better than a full gather scatter
-        return self.apply_elementwise_nd(
+        self.apply_elementwise_nd(
             buf,
             &op,
             meta.offset,

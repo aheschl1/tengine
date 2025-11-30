@@ -104,7 +104,7 @@ impl<T: TensorValue + TensorValueElementwise> BackendUnaryElementwise<T> for Cpu
             stride.to_vec(),
             offset,
         );
-        while let Some(idx) = iterator.next() {
+        for idx in iterator {
             bufptr[idx] = op.apply(bufptr[idx]);
         }
         Ok(())
