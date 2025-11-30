@@ -45,35 +45,35 @@ impl MetaTensor {
     pub fn rank(&self) -> usize { self.shape.len() }
     /// Returns an iterator over all offsets in the underlying buffer for this tensor/view.
     pub fn iter_offsets(&self) -> impl Iterator<Item = usize> + '_ {
-        let shape = self.shape.clone();
-        let stride = self.stride.clone();
         let offset = self.offset;
-        TensorOffsetIterator::new(shape, stride, offset)
+        TensorOffsetIterator::new(self.shape.as_slice(), self.stride.as_slice(), offset)
     }
 }
 
-pub(crate) struct TensorOffsetIterator {
-    shape: Shape,
-    stride: Stride,
-    current_indices: Vec<usize>,
-    done: bool,
-    base_offset: usize,
+pub struct TensorOffsetIterator<'a> {
+    shape:   &'a [usize],
+    stride:  &'a [isize],
+    offset0: isize,
+    index:   Vec<usize>,
+    started: bool,
+    done:    bool,
 }
 
-impl TensorOffsetIterator {
-    pub(crate) fn new(shape: Shape, stride: Stride, base_offset: usize) -> Self {
-        let dims = shape.len();
-        Self {
+impl<'a> TensorOffsetIterator<'a> {
+    pub fn new(shape: &'a [usize], stride: &'a [isize], base_offset: usize) -> Self {
+        let rank = shape.len();
+        TensorOffsetIterator {
             shape,
             stride,
-            current_indices: vec![0; dims],
-            done: false, // Start as not done - even scalars need one iteration
-            base_offset,
+            offset0: base_offset as isize,
+            index: vec![0; rank],
+            started: false,
+            done: false,
         }
     }
 }
 
-impl Iterator for TensorOffsetIterator {
+impl<'a> Iterator for TensorOffsetIterator<'a> {
     type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -81,31 +81,36 @@ impl Iterator for TensorOffsetIterator {
             return None;
         }
 
-        // Special case for scalars (0 dimensions)
         if self.shape.is_empty() {
-            self.done = true;
-            return Some(self.base_offset);
-        }
-
-        let mut offset: isize = self.base_offset as isize;
-        for (idx, stride) in self.current_indices.iter().zip(self.stride.iter()) {
-            offset += (*idx as isize) * *stride;
-        }
-
-        // Increment indices
-        for i in (0..self.current_indices.len()).rev() {
-            self.current_indices[i] += 1;
-            if self.current_indices[i] < self.shape[i] {
-                break;
-            } else {
-                self.current_indices[i] = 0;
-                if i == 0 {
-                    self.done = true;
-                }
+            if self.started {
+                self.done = true;
+                return None;
             }
+            self.started = true;
+            return Some(self.offset0 as usize);
         }
 
-        Some(offset as usize)
+        if !self.started {
+            self.started = true;
+        }
+
+        let mut off = self.offset0;
+        for (coord, stride) in self.index.iter().zip(self.stride.iter()) {
+            off += (*coord as isize) * *stride;
+        }
+        debug_assert!(off >= 0, "Negative offset in ND iterator is illegal.");
+        let phys = off as usize;
+
+        for dim in (0..self.index.len()).rev() {
+            self.index[dim] += 1;
+            if self.index[dim] < self.shape[dim] {
+                return Some(phys);
+            }
+            self.index[dim] = 0;
+        }
+
+        self.done = true;
+        Some(phys)
     }
 }
 
@@ -213,12 +218,6 @@ where
     fn meta(&self) -> &MetaTensor {
         &self.meta
     }
-}
-
-
-fn innermost_contiguous_dim(meta_tensor: &MetaTensor) -> Option<usize> {
-    let rank = meta_tensor.rank();
-    (0..rank).rev().find(|&d| meta_tensor.stride[d] == 1)
 }
 
 // / Computes memory regions for a given inner dimension.

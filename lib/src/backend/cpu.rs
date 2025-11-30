@@ -99,9 +99,9 @@ impl<T: TensorValue + TensorValueElementwise> BackendUnaryElementwise<T> for Cpu
         stride: &[isize],
     ) -> Result<(), TensorError> {
         let bufptr = buf.as_mut();
-        let mut iterator = TensorOffsetIterator::new(
-            shape.to_vec(),
-            stride.to_vec(),
+        let iterator = TensorOffsetIterator::new(
+            shape,
+            stride,
             offset,
         );
         for idx in iterator {
