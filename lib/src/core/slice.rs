@@ -52,9 +52,12 @@ impl From<RangeInclusive<usize>> for Slice {
         let start = *range.start();
         let end = *range.end();
         let step = if start > end { -1 } else { 1 };
+
+        // make end exclusive
+        let end = if step < 0 { if end > 0 { Some(end - 1) } else { None } } else { Some(end + 1) };
         Slice {
             start: Some(start),
-            end: Some(end), 
+            end: end, 
             step,
         }
     }
@@ -134,26 +137,30 @@ pub(crate) fn compute_sliced_parameters(
 {
     let slice: Slice = slice.into();
 
+    // Validate dimension for slicing over
     if dim >= shape.len() {
         return Err(TensorError::InvalidDim);
     }
     
+    // Validate step, should be non-zero
     let step: isize = slice.step;
     if step == 0 {
         return Err(TensorError::InvalidShape);
     }
 
+    // (inclusive)
     let start: isize = match slice.start {
-        Some(s) => s as isize,
-        None if step > 0 => 0,
-        None if step < 0 => (shape[dim] as isize) - 1,
+        Some(s) => s as isize,                  // as defined
+        None if step > 0 => 0,                         // default to start of dimension
+        None if step < 0 => (shape[dim] as isize) - 1, // default to end of dimension
         _ => unreachable!(),
     };
 
+    // (exclusive)
     let end: isize = match slice.end {
-        Some(e) => e as isize,
-        None if step > 0 => shape[dim] as isize,
-        None if step < 0 => -1,
+        Some(e) => e as isize,              // as defined
+        None if step > 0 => shape[dim] as isize,   // default to end of dimension 
+        None if step < 0 => -1,                    // default to before start of dimension
         _ => unreachable!(),
     };
 
@@ -162,6 +169,7 @@ pub(crate) fn compute_sliced_parameters(
         return Err(TensorError::IdxOutOfBounds);
     }
 
+    // start can be in full range, end can be no less than -1 (full), and must not exceed shape
     if step < 0 && (start < 0 || start >= shape[dim] as isize || end < -1 || end >= shape[dim] as isize) {
         return Err(TensorError::IdxOutOfBounds);
     }
@@ -172,7 +180,7 @@ pub(crate) fn compute_sliced_parameters(
             0
         } else {
             let dist = (start - end).abs() - 1;
-            (dist as usize / step.unsigned_abs()) + 1
+            (dist as usize / step.unsigned_abs()) + 1 // integer division rounding up
         }
     };
 
@@ -183,13 +191,11 @@ pub(crate) fn compute_sliced_parameters(
         new_shape.remove(dim);
         new_stride.remove(dim);
 
-        let clamped_start = start.clamp(0, (shape[dim] - 1) as isize);
-        let new_offset = offset + (clamped_start * stride[dim]).max(0) as usize;
+        let new_offset = offset + (start * stride[dim]).max(0) as usize;
         return Ok((new_shape, new_stride, new_offset));
     }
 
-    let clamped_start = start.clamp(0, (shape[dim] - 1) as isize) as usize;
-    let new_offset = offset + (clamped_start as isize * stride[dim]) as usize;
+    let new_offset = offset + (start * stride[dim]).max(0) as usize;
 
     let mut new_shape = shape.clone();
     let mut new_stride = stride.clone();
