@@ -41,6 +41,7 @@ let gpu_min = CudaTensor::<i32>::min((10, 1)); // 10x1 tensor of minimum i32 val
 
 let cpu_tensor = CpuTensor::<f64>::from_buf(vec![1.0, 2.0, 3.0, 4.0], (2, 2));
 let gpu_tensor = cpu_tensor.cuda();
+let cpu2 = gpu_tensor.cpu();
 
 let buf = vec![0.0f32; 16];
 let tensor = TensorBase::<f32, Cuda>::from_buf(buf, (4, 4));
@@ -64,6 +65,7 @@ let b: CpuTensor::<f32> = a.view() * 2.0;
 
 ```rust
 // Basic range slicing
+// slice(dimension, range), so modifications happen on the dimension specified
 tensor.slice(0, 2..5)           // Select elements at indices 2, 3, 4
 tensor.slice(0, 0..3)           // First 3 elements
 tensor.slice(0, ..5)            // Elements from start to index 5 (exclusive)
@@ -84,7 +86,7 @@ tensor.slice(0, 9..=0)          // Elements 9, 8, 7, ..., 1, 0 (auto step=-1)
 // Explicit negative step using Slice builder
 tensor.slice(0, Slice::from(..).step(-1))     // Reverse entire dimension
 tensor.slice(0, Slice::from(8..).step(-1))    // From index 8 to start, reversed
-tensor.slice(0, Slice::from(..5).step(-1))    // First 5 elements, reversed
+tensor.slice(0, Slice::from(..5).step(-1))    // last element to index 5, reversed
 
 // Custom step values
 tensor.slice(0, Slice::from(..).step(2))      // Every other element (0, 2, 4, 6, ...)

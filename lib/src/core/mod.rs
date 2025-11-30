@@ -351,7 +351,7 @@ mod tests {
         
         // Slice from index 6 down to index 2 with step -1
         let view = tensor.view();
-        let slice = view.slice(0, Slice::new(Some(6), Some(2), Some(-1))).unwrap();
+        let slice = view.slice(0, Slice::new(Some(6), Some(2), -1)).unwrap();
         assert_eq!(*slice.shape(), vec![4]);
         assert_eq!(index_tensor(Idx::At(0), &slice).unwrap(), 7); // index 6
         assert_eq!(index_tensor(Idx::At(1), &slice).unwrap(), 6); // index 5
@@ -411,7 +411,7 @@ mod tests {
         let tensor = make_tensor(buf, shape);
         
         let view = tensor.view();
-        let slice = view.slice(0, Slice::new(Some(2), Some(5), Some(-1))).unwrap();
+        let slice = view.slice(0, Slice::new(Some(2), Some(5), -1)).unwrap();
         assert_eq!(*slice.shape(), vec![]); // Empty slice
     }
 
@@ -423,7 +423,7 @@ mod tests {
         let tensor = make_tensor(buf, shape);
         
         let view = tensor.view();
-        let slice = view.slice(0, Slice::new(Some(5), Some(2), Some(1))).unwrap();
+        let slice = view.slice(0, Slice::new(Some(5), Some(2), 1)).unwrap();
         assert_eq!(*slice.shape(), vec![]); // Empty slice
     }
 
@@ -436,7 +436,7 @@ mod tests {
         
         // From index 5 going backwards to the beginning
         let view = tensor.view();
-        let slice = view.slice(0, Slice::new(Some(5), None, Some(-1))).unwrap();
+        let slice = view.slice(0, Slice::new(Some(5), None, -1)).unwrap();
         assert_eq!(*slice.shape(), vec![6]);
         assert_eq!(index_tensor(Idx::At(0), &slice).unwrap(), 6); // index 5
         assert_eq!(index_tensor(Idx::At(5), &slice).unwrap(), 1); // index 0
@@ -451,7 +451,7 @@ mod tests {
         
         // From the end going backwards to index 3
         let view = tensor.view();
-        let slice = view.slice(0, Slice::new(None, Some(3), Some(-1))).unwrap();
+        let slice = view.slice(0, Slice::new(None, Some(3), -1)).unwrap();
         assert_eq!(*slice.shape(), vec![4]);
         assert_eq!(index_tensor(Idx::At(0), &slice).unwrap(), 8); // index 7
         assert_eq!(index_tensor(Idx::At(3), &slice).unwrap(), 5); // index 4
@@ -563,19 +563,19 @@ mod tests {
         
         // Invalid start index with negative step
         assert!(matches!(
-            tensor.view().slice(0, Slice::new(Some(10), Some(2), Some(-1))),
+            tensor.view().slice(0, Slice::new(Some(10), Some(2), -1)),
             Err(TensorError::IdxOutOfBounds)
         ));
         
         // Invalid end index with negative step
         assert!(matches!(
-            tensor.view().slice(0, Slice::new(Some(5), Some(10), Some(-1))),
+            tensor.view().slice(0, Slice::new(Some(5), Some(10), -1)),
             Err(TensorError::IdxOutOfBounds)
         ));
         
         // Step of 0 should error
         assert!(matches!(
-            tensor.view().slice(0, Slice::new(Some(2), Some(5), Some(0))),
+            tensor.view().slice(0, Slice::new(Some(2), Some(5), 0)),
             Err(TensorError::InvalidShape)
         ));
     }
@@ -1491,5 +1491,474 @@ mod tests {
         assert_eq!(tensor.raw.len(), 1);
         assert_eq!(tensor.raw[0], 0.0);
 
+    }
+
+    #[test]
+    fn test_range_to_syntax() {
+        // Test ..5 syntax (from start to 5)
+        let buf = vec![10, 20, 30, 40, 50, 60, 70, 80];
+        let shape = vec![8];
+        let mut tensor = make_tensor(buf, shape);
+        
+        // Check values in slice
+        let view = tensor.view();
+        let slice = view.slice(0, ..5).unwrap();
+        assert_eq!(*slice.shape(), vec![5]);
+        assert_eq!(index_tensor(Idx::At(0), &slice).unwrap(), 10);
+        assert_eq!(index_tensor(Idx::At(1), &slice).unwrap(), 20);
+        assert_eq!(index_tensor(Idx::At(2), &slice).unwrap(), 30);
+        assert_eq!(index_tensor(Idx::At(3), &slice).unwrap(), 40);
+        assert_eq!(index_tensor(Idx::At(4), &slice).unwrap(), 50);
+        
+        // Test mutation - add to each element
+        let mut view_mut = tensor.view_mut();
+        let mut slice_mut = view_mut.slice_mut(0, ..5).unwrap();
+        slice_mut.set(&Idx::At(0), 11).unwrap();
+        slice_mut.set(&Idx::At(2), 33).unwrap();
+        slice_mut.set(&Idx::At(4), 55).unwrap();
+        
+        // Verify mutations reflected in original
+        let view = tensor.view();
+        assert_eq!(index_tensor(Idx::At(0), &view).unwrap(), 11);
+        assert_eq!(index_tensor(Idx::At(2), &view).unwrap(), 33);
+        assert_eq!(index_tensor(Idx::At(4), &view).unwrap(), 55);
+        assert_eq!(index_tensor(Idx::At(5), &view).unwrap(), 60); // Unchanged
+    }
+
+    #[test]
+    fn test_range_from_syntax() {
+        // Test 2.. syntax (from 2 to end)
+        let buf = vec![10, 20, 30, 40, 50, 60, 70, 80];
+        let shape = vec![8];
+        let mut tensor = make_tensor(buf, shape);
+        
+        // Check values in slice
+        let view = tensor.view();
+        let slice = view.slice(0, 2..).unwrap();
+        assert_eq!(*slice.shape(), vec![6]);
+        assert_eq!(index_tensor(Idx::At(0), &slice).unwrap(), 30);
+        assert_eq!(index_tensor(Idx::At(1), &slice).unwrap(), 40);
+        assert_eq!(index_tensor(Idx::At(5), &slice).unwrap(), 80);
+        
+        // Test mutation
+        let mut view_mut = tensor.view_mut();
+        let mut slice_mut = view_mut.slice_mut(0, 2..).unwrap();
+        slice_mut.set(&Idx::At(0), 333).unwrap();
+        slice_mut.set(&Idx::At(5), 888).unwrap();
+        
+        // Verify mutations reflected in original
+        let view = tensor.view();
+        assert_eq!(index_tensor(Idx::At(2), &view).unwrap(), 333);
+        assert_eq!(index_tensor(Idx::At(7), &view).unwrap(), 888);
+        assert_eq!(index_tensor(Idx::At(0), &view).unwrap(), 10); // Unchanged
+        assert_eq!(index_tensor(Idx::At(1), &view).unwrap(), 20); // Unchanged
+    }
+
+    #[test]
+    fn test_range_full_syntax() {
+        // Test .. syntax (full range)
+        let buf = vec![10, 20, 30, 40];
+        let shape = vec![4];
+        let mut tensor = make_tensor(buf, shape);
+        
+        // Check values in slice
+        let view = tensor.view();
+        let slice = view.slice(0, ..).unwrap();
+        assert_eq!(*slice.shape(), vec![4]);
+        assert_eq!(index_tensor(Idx::At(0), &slice).unwrap(), 10);
+        assert_eq!(index_tensor(Idx::At(1), &slice).unwrap(), 20);
+        assert_eq!(index_tensor(Idx::At(2), &slice).unwrap(), 30);
+        assert_eq!(index_tensor(Idx::At(3), &slice).unwrap(), 40);
+        
+        // Test mutation
+        let mut view_mut = tensor.view_mut();
+        let mut slice_mut = view_mut.slice_mut(0, ..).unwrap();
+        slice_mut.set(&Idx::At(0), 100).unwrap();
+        slice_mut.set(&Idx::At(3), 400).unwrap();
+        
+        // Verify mutations reflected in original
+        let view = tensor.view();
+        assert_eq!(index_tensor(Idx::At(0), &view).unwrap(), 100);
+        assert_eq!(index_tensor(Idx::At(3), &view).unwrap(), 400);
+    }
+
+    #[test]
+    fn test_inclusive_range_syntax() {
+        // Test 2..=5 syntax (inclusive end)
+        let buf = vec![10, 20, 30, 40, 50, 60, 70, 80];
+        let shape = vec![8];
+        let mut tensor = make_tensor(buf, shape);
+        
+        // Check values in slice
+        let view = tensor.view();
+        let slice = view.slice(0, 2..=5).unwrap();
+        assert_eq!(*slice.shape(), vec![4]); // Indices 2, 3, 4, 5
+        assert_eq!(index_tensor(Idx::At(0), &slice).unwrap(), 30);
+        assert_eq!(index_tensor(Idx::At(1), &slice).unwrap(), 40);
+        assert_eq!(index_tensor(Idx::At(2), &slice).unwrap(), 50);
+        assert_eq!(index_tensor(Idx::At(3), &slice).unwrap(), 60);
+        
+        // Test mutation
+        let mut view_mut = tensor.view_mut();
+        let mut slice_mut = view_mut.slice_mut(0, 2..=5).unwrap();
+        slice_mut.set(&Idx::At(0), 333).unwrap();
+        slice_mut.set(&Idx::At(3), 666).unwrap();
+        
+        // Verify mutations reflected in original
+        let view = tensor.view();
+        assert_eq!(index_tensor(Idx::At(2), &view).unwrap(), 333);
+        assert_eq!(index_tensor(Idx::At(5), &view).unwrap(), 666);
+        assert_eq!(index_tensor(Idx::At(1), &view).unwrap(), 20); // Unchanged
+        assert_eq!(index_tensor(Idx::At(6), &view).unwrap(), 70); // Unchanged
+    }
+
+    #[test]
+    fn test_inclusive_range_zero_end() {
+        // Test 0..=2 syntax (first 3 elements)
+        let buf = vec![10, 20, 30, 40, 50];
+        let shape = vec![5];
+        let mut tensor = make_tensor(buf, shape);
+        
+        // Check values in slice
+        let view = tensor.view();
+        let slice = view.slice(0, 0..=2).unwrap();
+        assert_eq!(*slice.shape(), vec![3]); // Indices 0, 1, 2
+        assert_eq!(index_tensor(Idx::At(0), &slice).unwrap(), 10);
+        assert_eq!(index_tensor(Idx::At(1), &slice).unwrap(), 20);
+        assert_eq!(index_tensor(Idx::At(2), &slice).unwrap(), 30);
+        
+        // Test mutation
+        let mut view_mut = tensor.view_mut();
+        let mut slice_mut = view_mut.slice_mut(0, 0..=2).unwrap();
+        slice_mut.set(&Idx::At(1), 222).unwrap();
+        
+        // Verify mutations reflected in original
+        let view = tensor.view();
+        assert_eq!(index_tensor(Idx::At(1), &view).unwrap(), 222);
+    }
+
+    #[test]
+    fn test_single_index_syntax() {
+        // Test single index 3 (reduces dimension)
+        let buf = vec![10, 20, 30, 40, 50, 60];
+        let shape = vec![2, 3];
+        let mut tensor = make_tensor(buf, shape);
+        
+        // Slice along dimension 1 (columns) at index 1
+        let view = tensor.view();
+        let slice = view.slice(1, 1).unwrap();
+        assert_eq!(*slice.shape(), vec![2]); // Dimension reduced
+        assert_eq!(index_tensor(Idx::At(0), &slice).unwrap(), 20); // First row, column 1
+        assert_eq!(index_tensor(Idx::At(1), &slice).unwrap(), 50); // Second row, column 1
+        
+        // Test mutation
+        let mut view_mut = tensor.view_mut();
+        let mut slice_mut = view_mut.slice_mut(1, 1).unwrap();
+        slice_mut.set(&Idx::At(0), 222).unwrap();
+        slice_mut.set(&Idx::At(1), 555).unwrap();
+        
+        // Verify mutations reflected in original
+        let view = tensor.view();
+        assert_eq!(index_tensor(Idx::Coord(&[0, 1]), &view).unwrap(), 222);
+        assert_eq!(index_tensor(Idx::Coord(&[1, 1]), &view).unwrap(), 555);
+        assert_eq!(index_tensor(Idx::Coord(&[0, 0]), &view).unwrap(), 10); // Unchanged
+        assert_eq!(index_tensor(Idx::Coord(&[0, 2]), &view).unwrap(), 30); // Unchanged
+    }
+
+    #[test]
+    fn test_reverse_range_exclusive_with_values() {
+        // Test 5..2 auto-reverse (step=-1)
+        let buf = vec![10, 20, 30, 40, 50, 60, 70, 80];
+        let shape = vec![8];
+        let mut tensor = make_tensor(buf, shape);
+        
+        // Check values in reversed slice
+        let view = tensor.view();
+        let slice = view.slice(0, 5..2).unwrap();
+        assert_eq!(*slice.shape(), vec![3]); // Indices 5, 4, 3
+        assert_eq!(index_tensor(Idx::At(0), &slice).unwrap(), 60); // Index 5
+        assert_eq!(index_tensor(Idx::At(1), &slice).unwrap(), 50); // Index 4
+        assert_eq!(index_tensor(Idx::At(2), &slice).unwrap(), 40); // Index 3
+        
+        // Test mutation
+        let mut view_mut = tensor.view_mut();
+        let mut slice_mut = view_mut.slice_mut(0, 5..2).unwrap();
+        slice_mut.set(&Idx::At(0), 666).unwrap(); // Should modify index 5
+        slice_mut.set(&Idx::At(2), 444).unwrap(); // Should modify index 3
+        
+        // Verify mutations reflected in original
+        let view = tensor.view();
+        assert_eq!(index_tensor(Idx::At(5), &view).unwrap(), 666);
+        assert_eq!(index_tensor(Idx::At(3), &view).unwrap(), 444);
+        assert_eq!(index_tensor(Idx::At(2), &view).unwrap(), 30); // Unchanged
+        assert_eq!(index_tensor(Idx::At(6), &view).unwrap(), 70); // Unchanged
+    }
+
+    #[test]
+    fn test_slice_from_with_step() {
+        // Test Slice::from(8..).step(-1) - from index 8 to start, reversed
+        let buf = vec![10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+        let shape = vec![10];
+        let mut tensor = make_tensor(buf, shape);
+        
+        // Check values
+        let view = tensor.view();
+        let slice = view.slice(0, Slice::from(8..).step(-1)).unwrap();
+        assert_eq!(*slice.shape(), vec![9]); // Indices 8, 7, 6, 5, 4, 3, 2, 1, 0
+        assert_eq!(index_tensor(Idx::At(0), &slice).unwrap(), 90);  // Index 8
+        assert_eq!(index_tensor(Idx::At(1), &slice).unwrap(), 80);  // Index 7
+        assert_eq!(index_tensor(Idx::At(8), &slice).unwrap(), 10);  // Index 0
+        
+        // Test mutation
+        let mut view_mut = tensor.view_mut();
+        let mut slice_mut = view_mut.slice_mut(0, Slice::from(8..).step(-1)).unwrap();
+        slice_mut.set(&Idx::At(0), 999).unwrap();  // Should modify index 8
+        slice_mut.set(&Idx::At(8), 111).unwrap();  // Should modify index 0
+        
+        // Verify mutations
+        let view = tensor.view();
+        assert_eq!(index_tensor(Idx::At(8), &view).unwrap(), 999);
+        assert_eq!(index_tensor(Idx::At(0), &view).unwrap(), 111);
+        assert_eq!(index_tensor(Idx::At(9), &view).unwrap(), 100); // Unchanged
+    }
+
+    #[test]
+    fn test_slice_to_with_step() {
+        // Test Slice::from(..5).step(-1) - from end down to index 5 (exclusive)
+        // With negative step and end=5, start defaults to last index (7)
+        // So this gives indices [7, 6, 5] going backwards = 3 elements
+        let buf = vec![10, 20, 30, 40, 50, 60, 70, 80];
+        let shape = vec![8];
+        let mut tensor = make_tensor(buf, shape);
+        
+        // Check values
+        let view = tensor.view();
+        let slice = view.slice(0, Slice::from(..5).step(-1)).unwrap();
+        assert_eq!(*slice.shape(), vec![2]); // Indices 7, 6 (end=5 is exclusive)
+        assert_eq!(index_tensor(Idx::At(0), &slice).unwrap(), 80); // Index 7
+        assert_eq!(index_tensor(Idx::At(1), &slice).unwrap(), 70); // Index 6
+        
+        // Test mutation
+        let mut view_mut = tensor.view_mut();
+        let mut slice_mut = view_mut.slice_mut(0, Slice::from(..5).step(-1)).unwrap();
+        slice_mut.set(&Idx::At(0), 888).unwrap(); // Should modify index 7
+        slice_mut.set(&Idx::At(1), 777).unwrap(); // Should modify index 6
+        
+        // Verify mutations
+        let view = tensor.view();
+        assert_eq!(index_tensor(Idx::At(7), &view).unwrap(), 888);
+        assert_eq!(index_tensor(Idx::At(6), &view).unwrap(), 777);
+        assert_eq!(index_tensor(Idx::At(5), &view).unwrap(), 60); // Unchanged (end is exclusive)
+        assert_eq!(index_tensor(Idx::At(4), &view).unwrap(), 50); // Unchanged
+    }
+
+    #[test]
+    fn test_reverse_first_n_elements() {
+        // To reverse first N elements, use Slice::new(Some(N-1), None, Some(-1))
+        // This gets elements from index N-1 down to 0
+        let buf = vec![10, 20, 30, 40, 50, 60, 70, 80];
+        let shape = vec![8];
+        let mut tensor = make_tensor(buf, shape);
+        
+        // Reverse first 5 elements: indices 4, 3, 2, 1, 0
+        let view = tensor.view();
+        let slice = view.slice(0, Slice::new(Some(4), None, -1)).unwrap();
+        assert_eq!(*slice.shape(), vec![5]);
+        assert_eq!(index_tensor(Idx::At(0), &slice).unwrap(), 50); // Index 4
+        assert_eq!(index_tensor(Idx::At(1), &slice).unwrap(), 40); // Index 3
+        assert_eq!(index_tensor(Idx::At(2), &slice).unwrap(), 30); // Index 2
+        assert_eq!(index_tensor(Idx::At(3), &slice).unwrap(), 20); // Index 1
+        assert_eq!(index_tensor(Idx::At(4), &slice).unwrap(), 10); // Index 0
+        
+        // Test mutation
+        let mut view_mut = tensor.view_mut();
+        let mut slice_mut = view_mut.slice_mut(0, Slice::new(Some(4), None, -1)).unwrap();
+        slice_mut.set(&Idx::At(0), 555).unwrap(); // Should modify index 4
+        slice_mut.set(&Idx::At(4), 111).unwrap(); // Should modify index 0
+        
+        // Verify mutations
+        let view = tensor.view();
+        assert_eq!(index_tensor(Idx::At(4), &view).unwrap(), 555);
+        assert_eq!(index_tensor(Idx::At(0), &view).unwrap(), 111);
+    }
+
+    #[test]
+    fn test_manual_slice_construction_values() {
+        // Test Slice::new(Some(8), Some(2), Some(-2)) - from 8 to 2, step -2
+        let buf = vec![10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+        let shape = vec![10];
+        let mut tensor = make_tensor(buf, shape);
+        
+        // Check values
+        let view = tensor.view();
+        let slice = view.slice(0, Slice::new(Some(8), Some(2), -2)).unwrap();
+        assert_eq!(*slice.shape(), vec![3]); // Indices 8, 6, 4
+        assert_eq!(index_tensor(Idx::At(0), &slice).unwrap(), 90);  // Index 8
+        assert_eq!(index_tensor(Idx::At(1), &slice).unwrap(), 70);  // Index 6
+        assert_eq!(index_tensor(Idx::At(2), &slice).unwrap(), 50);  // Index 4
+        
+        // Test mutation
+        let mut view_mut = tensor.view_mut();
+        let mut slice_mut = view_mut.slice_mut(0, Slice::new(Some(8), Some(2), -2)).unwrap();
+        slice_mut.set(&Idx::At(0), 999).unwrap();  // Should modify index 8
+        slice_mut.set(&Idx::At(2), 555).unwrap();  // Should modify index 4
+        
+        // Verify mutations
+        let view = tensor.view();
+        assert_eq!(index_tensor(Idx::At(8), &view).unwrap(), 999);
+        assert_eq!(index_tensor(Idx::At(4), &view).unwrap(), 555);
+        assert_eq!(index_tensor(Idx::At(6), &view).unwrap(), 70); // Unchanged until we check
+    }
+
+    #[test]
+    fn test_empty_slice_same_indices() {
+        // Test 5..5 (empty slice)
+        let buf = vec![10, 20, 30, 40, 50, 60];
+        let shape = vec![6];
+        let tensor = make_tensor(buf, shape);
+        
+        let view = tensor.view();
+        let slice = view.slice(0, 5..5).unwrap();
+        assert_eq!(*slice.shape(), vec![]); // Empty - dimension collapsed
+    }
+
+    #[test]
+    fn test_matrix_column_slice_with_mutation() {
+        // Test slicing a column from a matrix with value checks and mutation
+        let buf = vec![
+            1,  2,  3,  4,
+            5,  6,  7,  8,
+            9,  10, 11, 12
+        ];
+        let shape = vec![3, 4]; // 3 rows, 4 columns
+        let mut tensor = make_tensor(buf, shape);
+        
+        // Slice column 2 (third column)
+        let view = tensor.view();
+        let slice = view.slice(1, 2..3).unwrap();
+        assert_eq!(*slice.shape(), vec![3, 1]);
+        assert_eq!(index_tensor(Idx::Coord(&[0, 0]), &slice).unwrap(), 3);
+        assert_eq!(index_tensor(Idx::Coord(&[1, 0]), &slice).unwrap(), 7);
+        assert_eq!(index_tensor(Idx::Coord(&[2, 0]), &slice).unwrap(), 11);
+        
+        // Test mutation
+        let mut view_mut = tensor.view_mut();
+        let mut slice_mut = view_mut.slice_mut(1, 2..3).unwrap();
+        slice_mut.set(&Idx::Coord(&[0, 0]), 33).unwrap();
+        slice_mut.set(&Idx::Coord(&[2, 0]), 111).unwrap();
+        
+        // Verify mutations in original
+        let view = tensor.view();
+        assert_eq!(index_tensor(Idx::Coord(&[0, 2]), &view).unwrap(), 33);
+        assert_eq!(index_tensor(Idx::Coord(&[2, 2]), &view).unwrap(), 111);
+        assert_eq!(index_tensor(Idx::Coord(&[1, 2]), &view).unwrap(), 7); // Unchanged
+    }
+
+    #[test]
+    fn test_3d_depth_slice_with_mutation() {
+        // Test 3D tensor depth slicing with value checks and mutation
+        let buf = vec![
+            // Depth 0
+            1, 2,
+            3, 4,
+            // Depth 1
+            5, 6,
+            7, 8,
+            // Depth 2
+            9, 10,
+            11, 12
+        ];
+        let shape = vec![3, 2, 2]; // 3 depth, 2 rows, 2 columns
+        let mut tensor = make_tensor(buf, shape);
+        
+        // Slice depth 1..=1 (second depth slice)
+        let view = tensor.view();
+        let slice = view.slice(0, 1..=1).unwrap();
+        assert_eq!(*slice.shape(), vec![1, 2, 2]);
+        assert_eq!(index_tensor(Idx::Coord(&[0, 0, 0]), &slice).unwrap(), 5);
+        assert_eq!(index_tensor(Idx::Coord(&[0, 0, 1]), &slice).unwrap(), 6);
+        assert_eq!(index_tensor(Idx::Coord(&[0, 1, 0]), &slice).unwrap(), 7);
+        assert_eq!(index_tensor(Idx::Coord(&[0, 1, 1]), &slice).unwrap(), 8);
+        
+        // Test mutation
+        let mut view_mut = tensor.view_mut();
+        let mut slice_mut = view_mut.slice_mut(0, 1..=1).unwrap();
+        slice_mut.set(&Idx::Coord(&[0, 0, 0]), 55).unwrap();
+        slice_mut.set(&Idx::Coord(&[0, 1, 1]), 88).unwrap();
+        
+        // Verify mutations in original
+        let view = tensor.view();
+        assert_eq!(index_tensor(Idx::Coord(&[1, 0, 0]), &view).unwrap(), 55);
+        assert_eq!(index_tensor(Idx::Coord(&[1, 1, 1]), &view).unwrap(), 88);
+        assert_eq!(index_tensor(Idx::Coord(&[0, 0, 0]), &view).unwrap(), 1); // Unchanged
+        assert_eq!(index_tensor(Idx::Coord(&[2, 0, 0]), &view).unwrap(), 9); // Unchanged
+    }
+
+    #[test]
+    fn test_chained_slices_with_mutation() {
+        // Test chaining different slice syntaxes with mutation
+        let buf = vec![
+            1,  2,  3,  4,  5,  6,
+            7,  8,  9,  10, 11, 12,
+            13, 14, 15, 16, 17, 18,
+            19, 20, 21, 22, 23, 24
+        ];
+        let shape = vec![4, 6]; // 4 rows, 6 columns
+        let mut tensor = make_tensor(buf, shape);
+        
+        // First slice: rows 1..3
+        let view = tensor.view();
+        let slice1 = view.slice(0, 1..3).unwrap();
+        assert_eq!(*slice1.shape(), vec![2, 6]);
+        
+        // Second slice: columns 2..=4 (inclusive)
+        let slice2 = slice1.slice(1, 2..=4).unwrap();
+        assert_eq!(*slice2.shape(), vec![2, 3]);
+        assert_eq!(index_tensor(Idx::Coord(&[0, 0]), &slice2).unwrap(), 9);   // Row 1, Col 2
+        assert_eq!(index_tensor(Idx::Coord(&[0, 2]), &slice2).unwrap(), 11);  // Row 1, Col 4
+        assert_eq!(index_tensor(Idx::Coord(&[1, 0]), &slice2).unwrap(), 15);  // Row 2, Col 2
+        assert_eq!(index_tensor(Idx::Coord(&[1, 2]), &slice2).unwrap(), 17);  // Row 2, Col 4
+        
+        // Test mutation through chained slices
+        let mut view_mut = tensor.view_mut();
+        let mut slice1_mut = view_mut.slice_mut(0, 1..3).unwrap();
+        let mut slice2_mut = slice1_mut.slice_mut(1, 2..=4).unwrap();
+        slice2_mut.set(&Idx::Coord(&[0, 1]), 999).unwrap(); // Row 1, Col 3 in original
+        slice2_mut.set(&Idx::Coord(&[1, 2]), 1717).unwrap(); // Row 2, Col 4 in original
+        
+        // Verify mutations in original
+        let view = tensor.view();
+        assert_eq!(index_tensor(Idx::Coord(&[1, 3]), &view).unwrap(), 999);
+        assert_eq!(index_tensor(Idx::Coord(&[2, 4]), &view).unwrap(), 1717);
+    }
+
+    #[test]
+    fn test_step_2_with_mutation() {
+        // Test custom step with value checks and mutation
+        let buf = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        let shape = vec![10];
+        let mut tensor = make_tensor(buf, shape);
+        
+        // Every other element starting from index 1
+        let view = tensor.view();
+        let slice = view.slice(0, Slice::from(1..9).step(2)).unwrap();
+        assert_eq!(*slice.shape(), vec![4]); // Indices 1, 3, 5, 7
+        assert_eq!(index_tensor(Idx::At(0), &slice).unwrap(), 2);
+        assert_eq!(index_tensor(Idx::At(1), &slice).unwrap(), 4);
+        assert_eq!(index_tensor(Idx::At(2), &slice).unwrap(), 6);
+        assert_eq!(index_tensor(Idx::At(3), &slice).unwrap(), 8);
+        
+        // Test mutation
+        let mut view_mut = tensor.view_mut();
+        let mut slice_mut = view_mut.slice_mut(0, Slice::from(1..9).step(2)).unwrap();
+        slice_mut.set(&Idx::At(0), 22).unwrap();  // Index 1
+        slice_mut.set(&Idx::At(3), 88).unwrap();  // Index 7
+        
+        // Verify mutations
+        let view = tensor.view();
+        assert_eq!(index_tensor(Idx::At(1), &view).unwrap(), 22);
+        assert_eq!(index_tensor(Idx::At(7), &view).unwrap(), 88);
+        assert_eq!(index_tensor(Idx::At(0), &view).unwrap(), 1); // Unchanged
+        assert_eq!(index_tensor(Idx::At(2), &view).unwrap(), 3); // Unchanged (skipped by step)
     }
 }

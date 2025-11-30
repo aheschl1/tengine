@@ -7,21 +7,21 @@ use super::tensor::TensorError;
 pub struct Slice {
     pub start: Option<usize>,
     pub end: Option<usize>,
-    pub step: Option<isize>,
+    pub step: isize,
 }
 
 impl Slice {
-    pub fn new(start: Option<usize>, end: Option<usize>, step: Option<isize>) -> Self {
+    pub fn new(start: Option<usize>, end: Option<usize>, step: isize) -> Self {
         Slice { start, end, step }
     }
 
     /// Creates a full slice (equivalent to `..`).
     pub fn full() -> Self {
-        Slice { start: None, end: None, step: None }
+        Slice { start: None, end: None, step: 1 }
     }
 
     pub fn step(mut self, step: isize) -> Self {
-        self.step = Some(step);
+        self.step = step;
         self
     }
 
@@ -38,19 +38,11 @@ impl Slice {
 
 impl From<Range<usize>> for Slice {
     fn from(range: Range<usize>) -> Self {
-        // Automatically infer negative step if start > end
-        if range.start > range.end {
-            Slice {
-                start: Some(range.start),
-                end: Some(range.end),
-                step: Some(-1),
-            }
-        } else {
-            Slice {
-                start: Some(range.start),
-                end: Some(range.end),
-                step: None,
-            }
+        let step = if range.start > range.end { -1 } else { 1 };
+        Slice {
+            start: Some(range.start),
+            end: Some(range.end),
+            step,
         }
     }
 }
@@ -59,20 +51,11 @@ impl From<RangeInclusive<usize>> for Slice {
     fn from(range: RangeInclusive<usize>) -> Self {
         let start = *range.start();
         let end = *range.end();
-        
-        // Automatically infer negative step if start > end
-        if start > end {
-            Slice {
-                start: Some(start),
-                end: if end == 0 { None } else { Some(end - 1) }, // For negative step, end is exclusive, so end-1 to include 'end'
-                step: Some(-1),
-            }
-        } else {
-            Slice {
-                start: Some(start),
-                end: Some(end + 1), // Convert inclusive to exclusive
-                step: None,
-            }
+        let step = if start > end { -1 } else { 1 };
+        Slice {
+            start: Some(start),
+            end: Some(end), 
+            step,
         }
     }
 }
@@ -82,7 +65,7 @@ impl From<RangeFrom<usize>> for Slice {
         Slice {
             start: Some(range.start),
             end: None,
-            step: None,
+            step: 1,
         }
     }
 }
@@ -92,7 +75,7 @@ impl From<RangeTo<usize>> for Slice {
         Slice {
             start: None,
             end: Some(range.end),
-            step: None,
+            step: 1,
         }
     }
 }
@@ -108,7 +91,7 @@ impl From<usize> for Slice {
         Slice {
             start: Some(idx),
             end: Some(idx),
-            step: None,
+            step: 1,
         }
     }
 }
@@ -155,7 +138,7 @@ pub(crate) fn compute_sliced_parameters(
         return Err(TensorError::InvalidDim);
     }
     
-    let step: isize = slice.step.unwrap_or(1);
+    let step: isize = slice.step;
     if step == 0 {
         return Err(TensorError::InvalidShape);
     }
@@ -227,7 +210,7 @@ mod tests {
         let slice: Slice = (2..5).into();
         assert_eq!(slice.start, Some(2));
         assert_eq!(slice.end, Some(5));
-        assert_eq!(slice.step, None);
+        assert_eq!(slice.step, 1);
     }
 
     #[test]
@@ -235,7 +218,7 @@ mod tests {
         let slice: Slice = 3.into();
         assert_eq!(slice.start, Some(3));
         assert_eq!(slice.end, Some(3));
-        assert_eq!(slice.step, None);
+        assert_eq!(slice.step, 1);
     }
 
     #[test]
@@ -243,12 +226,12 @@ mod tests {
         let slice = Slice::full().step(-2).start(10).end(2);
         assert_eq!(slice.start, Some(10));
         assert_eq!(slice.end, Some(2));
-        assert_eq!(slice.step, Some(-2));
+        assert_eq!(slice.step, -2);
     }
 
     #[test]
     fn test_slice_range_bounds() {
-        let slice = Slice::new(Some(2), Some(8), None);
+        let slice = Slice::new(Some(2), Some(8), 1);
         assert_eq!(slice.start_bound(), std::ops::Bound::Included(&2));
         assert_eq!(slice.end_bound(), std::ops::Bound::Excluded(&8));
     }
