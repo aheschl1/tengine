@@ -42,8 +42,6 @@ impl<'a> From<&'a Vec<Dim>> for Idx<'a> {
 
 impl From<Vec<Dim>> for Idx<'_> {
     /// Converts an owned vector of coordinates into a multi-dimensional index.
-    /// Note: this leaks the vector as a slice with `'static` lifetime to match
-    /// the `Idx` borrowing API. Prefer the borrowed forms when possible.
     fn from(value: Vec<Dim>) -> Self {
         Idx::Coord(Box::leak(value.into_boxed_slice()))
     }

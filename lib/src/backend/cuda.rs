@@ -2,7 +2,7 @@ use std::sync::{atomic::{AtomicBool, Ordering}, Arc, LazyLock, Mutex};
 
 use cudarc::driver::{CudaContext, CudaSlice, DevicePtr, DeviceRepr};
 
-use crate::{backend::{Backend, BackendUnaryElementwise}, core::{meta::TensorOffsetIterator, tensor::TensorError, value::{TensorValue, TensorValueElementwise}}, ops::unary::ElementwiseTensorOp};
+use crate::{backend::{Backend, BackendUnaryElementwise}, core::{tensor::TensorError, value::{TensorValue, TensorValueElementwise}}, ops::unary::ElementwiseTensorOp};
 
 // Include bindgen-generated FFI declarations for CUDA kernel launchers
 #[allow(non_camel_case_types)]
@@ -78,7 +78,7 @@ impl CudaBackend {
     }
 }
 
-impl<T: TensorValue + DeviceRepr> Backend<T> for CudaBackend {
+impl<T: TensorValue> Backend<T> for CudaBackend {
     type Buf = CudaBuf<T>;
     
     fn alloc_from_slice(&self, src: Box<[T]>) -> Result<Self::Buf, crate::core::tensor::TensorError> {
@@ -172,7 +172,7 @@ impl<T: TensorValue + DeviceRepr> Backend<T> for CudaBackend {
     
 }
 
-impl<T: TensorValueElementwise + DeviceRepr + 'static> BackendUnaryElementwise<T> for CudaBackend {
+impl<T: TensorValueElementwise + DeviceRepr> BackendUnaryElementwise<T> for CudaBackend {
     
     fn apply_elementwise_contiguous(
         &self, buf: &mut Self::Buf, 
@@ -209,7 +209,8 @@ impl<T: TensorValueElementwise + DeviceRepr + 'static> BackendUnaryElementwise<T
         }
 
         // Dispatch based on type
-        match std::any::TypeId::of::<T>() {
+        let tid = std::any::TypeId::of::<T>();
+        match tid {
             id if id == std::any::TypeId::of::<f32>() => launch_elementwise!(launch_elementwise_contiguous_f32, f32),
             id if id == std::any::TypeId::of::<f64>() => launch_elementwise!(launch_elementwise_contiguous_f64, f64),
             id if id == std::any::TypeId::of::<u8>() => launch_elementwise!(launch_elementwise_contiguous_u8, u8),
