@@ -13,34 +13,15 @@ macro_rules! tset {
     }};
 }
 
-// macro_rules! tslice {
-//     ($tensor_view:expr $(, $range:expr)+ $(,)?) => {{
-//         let base = $tensor_view;
-
-//         let mut _idx = 0;
-
-//         // start the chain with a binding
-//         let mut _view = base.slice(_idx, $range).unwrap();
-//         _idx += 1;
-
-//         $(
-//             _view = _view.slice(_idx, $range).unwrap();
-//             _idx += 1;
-//         )*
-
-//         _view
-//     }};
-// }
-
-
 
 #[cfg(test)]
 mod tests {
-    use crate::core::{tensor::{AsView, AsViewMut, TensorAccess, TensorAccessMut}, value::TensorValue, CpuTensor, MetaTensorView, Shape};
+    use crate::core::{tensor::{AsView, AsViewMut}, value::TensorValue, CpuTensor, Shape};
+    use crate::core::tensor::{TensorAccess, TensorAccessMut};
     use crate::core::idx::Idx;
 
 
-    fn make_tensor<T: TensorValue>(buf: Vec<T>, shape: Shape) -> CpuTensor<T> {
+    fn make_tensor<T: TensorValue>(buf: Vec<T>, shape: impl Into<Shape>) -> CpuTensor<T> {
         CpuTensor::from_buf(buf, shape).unwrap()
     }
 

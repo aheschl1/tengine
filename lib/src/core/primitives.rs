@@ -151,7 +151,8 @@ where
     ///
     /// Errors
     /// - `InvalidShape` if element count doesn't match.
-    pub fn from_buf(raw: impl Into<Box<[T]>>, shape: Shape) -> Result<Self, TensorError> {
+    pub fn from_buf(raw: impl Into<Box<[T]>>, shape: impl Into<Shape>) -> Result<Self, TensorError> {
+        let shape: Shape = shape.into();
         let backend = B::new();
         let buffer = backend.alloc_from_slice(raw.into())?;
         if shape.iter().product::<usize>() != backend.len(&buffer) {

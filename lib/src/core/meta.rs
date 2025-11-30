@@ -1,10 +1,82 @@
+use std::ops::{Index, IndexMut};
+
 use crate::{backend::Backend, core::{primitives::TensorBase, value::TensorValue, TensorViewMut}};
 
 use super::primitives::TensorView;
 
 pub type Dim = usize;
 pub type Stride = Vec<isize>;
-pub type Shape = Vec<Dim>;
+// pub type Shape = Vec<Dim>;
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Shape(pub Vec<Dim>);
+
+impl Into<Vec<Dim>> for Shape {
+    fn into(self) -> Vec<Dim> {
+        self.0
+    }
+}
+
+impl From<Vec<Dim>> for Shape {
+    fn from(v: Vec<Dim>) -> Self {
+        Shape(v)
+    }
+}
+
+impl AsRef<[Dim]> for Shape {
+    fn as_ref(&self) -> &[Dim] {
+        &self.0
+    }
+}
+
+impl Shape {
+    pub fn empty() -> Self {
+        Shape(vec![])
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, Dim> {
+        self.0.iter()
+    }
+
+    pub fn as_slice(&self) -> &[Dim] {
+        &self.0
+    }
+    pub fn remove(&mut self, index: usize) -> Dim {
+        self.0.remove(index)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn contains(&self, dim: &Dim) -> bool {
+        self.0.contains(dim)
+    }
+}
+
+impl Index<usize> for Shape {
+    type Output = Dim;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl IndexMut<usize> for Shape {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.0[index]
+    }
+}
+
+impl PartialEq<Vec<Dim>> for Shape {
+    fn eq(&self, other: &Vec<Dim>) -> bool {
+        &self.0 == other
+    }
+}
 
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -17,8 +89,8 @@ pub struct MetaTensor {
 
 impl MetaTensor {
     /// Creates tensor metadata with explicit shape, stride and offset.
-    pub fn new(shape: Shape, stride: Stride, offset: usize) -> Self {
-        Self { shape, stride, offset }
+    pub fn new(shape: impl Into<Shape>, stride: Stride, offset: usize) -> Self {
+        Self { shape: shape.into(), stride, offset }
     }
 
     /// Returns true when the metadata describes a scalar (rank 0).

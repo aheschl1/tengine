@@ -73,7 +73,7 @@ pub trait BackendUnaryElementwise<T: TensorValue + TensorValueElementwise>: Back
             buf,
             &op,
             meta.offset,
-            &meta.shape,
+            meta.shape.as_slice(),
             &meta.stride,
         )
     }

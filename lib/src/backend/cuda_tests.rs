@@ -92,7 +92,7 @@ mod tests {
     use super::*;
     use crate::core::{idx::Idx, primitives::CudaTensor, tensor::{AsView, AsViewMut, TensorAccess, TensorAccessMut, TensorError}, value::TensorValue, MetaTensorView, Shape, Slice};
     
-    fn make_cuda_tensor<T: TensorValue + cudarc::driver::DeviceRepr>(buf: Vec<T>, shape: Shape) -> CudaTensor<T> {
+    fn make_cuda_tensor<T: TensorValue + cudarc::driver::DeviceRepr>(buf: Vec<T>, shape: impl Into<Shape>) -> CudaTensor<T> {
         CudaTensor::from_buf(buf, shape).unwrap()
     }
 

@@ -15,8 +15,8 @@ pub use slice::Slice;
 mod tests {
     use crate::{backend::Backend, core::{idx::Idx, value::TensorValue, tensor::{AsTensor, AsView, AsViewMut, TensorAccess, TensorAccessMut, TensorError}, CpuTensor, MetaTensor, MetaTensorView, Shape, Stride, Slice}};
 
-    fn make_tensor<T: TensorValue>(buf: Vec<T>, shape: Shape) -> CpuTensor<T> {
-        CpuTensor::from_buf(buf, shape).unwrap()
+    fn make_tensor<T: TensorValue>(buf: Vec<T>, shape: impl Into<Shape>) -> CpuTensor<T> {
+        CpuTensor::from_buf(buf, shape.into()).unwrap()
     }
 
     #[test]
@@ -1017,7 +1017,7 @@ mod tests {
     #[test]
     fn test_shape_to_stride() {
         let shape = vec![2, 2, 3];
-        let stride: Stride = super::shape_to_stride(&shape);
+        let stride: Stride = super::shape_to_stride(&shape.into());
 
         assert_eq!(stride, vec![6, 3, 1]);
     }
@@ -1025,14 +1025,14 @@ mod tests {
     #[test]
     fn test_shape_to_stride_single_dim() {
         let shape = vec![4];
-        let stride: Stride = super::shape_to_stride(&shape);
+        let stride: Stride = super::shape_to_stride(&shape.into());
 
         assert_eq!(stride, vec![1]);
     }
 
     #[test]
     fn test_shape_to_stride_empty() {
-        let shape: Shape = vec![];
+        let shape: Shape = Shape::empty();
         let stride: Stride = super::shape_to_stride(&shape);
 
         assert!(stride.is_empty());
@@ -1041,7 +1041,7 @@ mod tests {
     #[test]
     fn test_shape_to_stride_ones() {
         let shape = vec![1, 1, 1];
-        let stride: Stride = super::shape_to_stride(&shape);
+        let stride: Stride = super::shape_to_stride(&shape.into());
 
         assert_eq!(stride, vec![1, 1, 1]);
     }
@@ -1049,7 +1049,7 @@ mod tests {
     #[test]
     fn test_shape_to_stride_mixed() {
         let shape = vec![5, 1, 2];
-        let stride: Stride = super::shape_to_stride(&shape);
+        let stride: Stride = super::shape_to_stride(&shape.into());
 
         assert_eq!(stride, vec![2, 2, 1]);
     }
@@ -1057,7 +1057,7 @@ mod tests {
     #[test]
     fn test_shape_to_stride_larger() {
         let shape = vec![3, 4, 5];
-        let stride: Stride = super::shape_to_stride(&shape);
+        let stride: Stride = super::shape_to_stride(&shape.into());
 
         assert_eq!(stride, vec![20, 5, 1]);
     }
@@ -1349,7 +1349,7 @@ mod tests {
     fn test_tensor_meta_direct_impl() {
         // contiguous meta
         let shape = vec![2, 3];
-        let stride = super::shape_to_stride(&shape);
+        let stride = super::shape_to_stride(&shape.clone().into());
         let meta = MetaTensor::new(shape.clone(), stride.clone(), 0);
         assert_eq!(meta.shape(), &shape);
         assert_eq!(meta.stride(), &stride);
