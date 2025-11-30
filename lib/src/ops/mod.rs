@@ -51,7 +51,7 @@ mod tests {
         let mut tensor = TensorBase::<Cpu, i32>::from_buf(vec![10, 20, 30], vec![3]).unwrap();
         let value = 10;
         let mut view = tensor.view_mut();
-        view -= &value;
+        view -= value;
         let expected = TensorBase::<Cpu, i32>::from_buf(vec![0, 10, 20], vec![3]).unwrap();
         assert_eq!(tensor.raw.clone(), expected.raw);
     }
@@ -279,7 +279,7 @@ mod tests {
         let mut tensor = TensorBase::<Cpu, i32>::from_buf(vec![10, 20, 30], vec![3]).unwrap();
         let value = 10;
         let view = tensor.view_mut();
-        let result = view - &value;
+        let result = view - value;
         
         assert_eq!(result.raw, vec![0, 10, 20].into_boxed_slice());
         assert_eq!(tensor.raw, vec![10, 20, 30].into_boxed_slice());
@@ -1184,7 +1184,7 @@ mod cuda_tests {
         let mut tensor = CudaTensor::<i32>::from_buf(vec![10, 20, 30], vec![3]).unwrap();
         let value = 10;
         let mut view = tensor.view_mut();
-        view -= &value;
+        view -= value;
         let expected = CpuTensor::<i32>::from_buf(vec![0, 10, 20], vec![3]).unwrap();
         assert_eq!(tensor.cpu().unwrap(), expected);
     }

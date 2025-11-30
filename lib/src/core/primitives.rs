@@ -1,8 +1,5 @@
 use std::marker::PhantomData;
 
-#[cfg(feature = "cuda")]
-use cudarc::driver::DeviceRepr;
-
 use crate::backend::Backend;
 use crate::backend::cpu::Cpu;
 use crate::core::value::TensorValue;
@@ -41,7 +38,7 @@ pub type CpuTensor<T> = TensorBase<Cpu, T>;
 pub type CudaTensor<T> = TensorBase<crate::backend::cuda::CudaBackend, T>;
 
 #[cfg(feature = "cuda")]
-impl<T: TensorValue + DeviceRepr> CudaTensor<T> {
+impl<T: TensorValue> CudaTensor<T> {
     /// Transfers this tensor from the CUDA backend to a CPU tensor.
     pub fn cpu(&self) -> Result<CpuTensor<T>, TensorError> {
         let cpu_backend = Cpu;
@@ -52,7 +49,7 @@ impl<T: TensorValue + DeviceRepr> CudaTensor<T> {
 }
 
 #[cfg(feature = "cuda")]
-impl<T: TensorValue + DeviceRepr> CpuTensor<T> {
+impl<T: TensorValue> CpuTensor<T> {
     /// Transfers this tensor from the CPU backend to a CUDA tensor.
     pub fn cuda(&self) -> Result<CudaTensor<T>, TensorError> {
         let cuda_backend = crate::backend::cuda::CudaBackend::construct(0)?;

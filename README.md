@@ -10,7 +10,7 @@ Goal is high performance ML stack with minimal dependencies and maximal flexibil
 - [X] Nicer syntax. macro time `tset!(tensor.view_mut(), v: 99, 1, 2)` and `tget!(tensor.view(), 1, 2)`
 - [X] Basic GPU backend
 - [X] Slicing with ranges `tensor.view().slice(0, 1..3)` etc.
-- [ ] Test more slicing syntaxes
+- [X] Test more slicing syntaxes
 - [ ] Slicing macro
 - [X] Elementwise broadcasting
 - [ ] Basic linear algebra helpers
@@ -19,6 +19,7 @@ Goal is high performance ML stack with minimal dependencies and maximal flexibil
 - [ ] Multiple gpu devices allowed
 - [ ] CUDA scheduler for syncing and fusing ops
 - [X] Do not lock thread on GPU dispatch
+- [ ] strides and offset as bytes 
 
 ## to optimize
 

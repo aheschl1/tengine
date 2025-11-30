@@ -37,7 +37,7 @@ pub trait AsView<T: TensorValue, B: Backend<T>> {
 pub trait AsViewMut<T: TensorValue, B: Backend<T>> : AsView<T, B> {
     /// Returns a mutable view over the tensor data, sharing the same
     /// underlying buffer and metadata (shape/stride/offset) without copying.
-    fn view_mut(&mut self) -> TensorViewMut<'_, T, B>;
+    fn view_mut<'a>(&'a mut self) -> TensorViewMut<'a, T, B>;
 }
 
 pub trait AsTensor<T: TensorValue, B: Backend<T>> {
@@ -56,7 +56,7 @@ impl<T: TensorValue, B: Backend<T>> AsView<T, B> for TensorBase<B, T> {
 } 
 
 impl<T: TensorValue, B: Backend<T>> AsViewMut<T, B> for TensorBase<B, T> {
-    fn view_mut(&mut self) -> TensorViewMut<'_, T, B> {
+    fn view_mut<'a>(&'a mut self) -> TensorViewMut<'a, T, B> {
         TensorViewMut::<T, B>::from_parts(
             &mut self.raw, 
             &self.backend, 
