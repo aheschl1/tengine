@@ -31,6 +31,7 @@ Goal is high performance ML stack with minimal dependencies and maximal flexibil
 - [X] perf sucks for contiguous memory in unary CUDA - fix
 - [X] perf sucks for non-contiguous memory in unary CPU - fix
 - [X] perf sucks for non-contiguous memory in unary CUDA - fix
+- [ ] O(rank * size) instead of O(size) broadcasting ops is bad
 
 ## Creating Tensors
 

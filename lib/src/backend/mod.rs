@@ -81,7 +81,7 @@ pub trait BackendUnaryElementwise<T: TensorValue + TensorValueElementwise>: Back
 
 pub trait BackendBinaryElementwise<T: TensorValue + TensorValueElementwise>: Backend<T> {
 
-    fn merge(
+    fn broadcast(
         &self, 
         left: (&Self::Buf, &MetaTensor), 
         right: (&Self::Buf, &MetaTensor),

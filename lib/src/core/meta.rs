@@ -102,6 +102,9 @@ impl MetaTensor {
         let offset = self.offset;
         TensorOffsetIterator::new(self.shape.as_slice(), self.stride.as_slice(), offset)
     }
+    pub fn iter_coords(&self) -> impl Iterator<Item = Vec<usize>> + '_ {
+        CoordIter::new(self.shape.as_slice())
+    }
     pub fn ith_offset(&self, i: usize) -> usize {
         let mut idx = i;
         let mut coords = vec![0; self.rank()];
@@ -184,6 +187,62 @@ impl<'a> Iterator for TensorOffsetIterator<'a> {
         Some(phys)
     }
 }
+
+pub struct CoordIter<'a> {
+    shape: &'a [usize],
+    coords: Vec<usize>,
+    started: bool,
+    done: bool,
+}
+
+impl<'a> CoordIter<'a> {
+    pub fn new(shape: &'a [usize]) -> Self {
+        let r = shape.len();
+        Self {
+            shape,
+            coords: vec![0; r],
+            started: false,
+            done: false,
+        }
+    }
+}
+
+impl<'a> Iterator for CoordIter<'a> {
+    type Item = Vec<usize>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.done {
+            return None;
+        }
+
+        if self.shape.is_empty() {
+            if self.started {
+                self.done = true;
+                return None;
+            }
+            self.started = true;
+            return Some(vec![]);
+        }
+
+        if !self.started {
+            self.started = true;
+            return Some(self.coords.clone());
+        }
+
+        // Multi-dimensional counting
+        for d in (0..self.coords.len()).rev() {
+            self.coords[d] += 1;
+            if self.coords[d] < self.shape[d] {
+                return Some(self.coords.clone());
+            }
+            self.coords[d] = 0;
+        }
+
+        self.done = true;
+        Some(self.coords.clone())
+    }
+}
+
 
 /// Computes the standard row-major stride for a given shape.
 pub fn shape_to_stride(shape: &Shape) -> Stride {

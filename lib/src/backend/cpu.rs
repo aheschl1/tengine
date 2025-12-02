@@ -114,7 +114,7 @@ impl<T: TensorValue + TensorValueElementwise> BackendUnaryElementwise<T> for Cpu
 impl<T> BackendBinaryElementwise<T> for Cpu 
 where T: TensorValueElementwise
 {
-    fn merge(
+    fn broadcast(
         &self, 
         left: (&Self::Buf, &MetaTensor), 
         right: (&Self::Buf, &MetaTensor),
@@ -125,15 +125,38 @@ where T: TensorValueElementwise
         let (right_buf, right_meta) = right;
         let (dst_buf, dst_meta) = dst;
 
-        for out_offset in dst_meta.iter_offsets() {
-            let left_offset = left_meta.ith_offset(out_offset);
-            let right_offset = right_meta.ith_offset(out_offset);
+        let rank = dst_meta.rank();
 
-            let a = left_buf[left_offset];
-            let b = right_buf[right_offset];
+        let sl = left_meta.stride();
+        let sr = right_meta.stride();
+        let sd = dst_meta.stride();
 
-            dst_buf[out_offset] = op.apply(a, b);
+        let mut ol = left_meta.offset() as isize;
+        let mut or = right_meta.offset() as isize;
+        let mut od = dst_meta.offset() as isize;
 
+        let mut coords = vec![0; rank];
+
+        let mut first = true;
+
+        for new_coord in dst_meta.iter_coords() {
+            if first {
+                first = false;
+            } else{
+                for d in (0..rank).rev() {
+                    if new_coord[d] != coords[d] {
+                        let delta = new_coord[d] as isize - coords[d] as isize;
+                        ol += delta * sl[d];
+                        or += delta * sr[d];
+                        od += delta * sd[d];
+                    }
+                }
+            }
+            coords = new_coord;
+            debug_assert!(od >= 0);
+            debug_assert!(ol >= 0);
+            debug_assert!(or >= 0);
+            dst_buf[od as usize] = op.apply(left_buf[ol as usize], right_buf[or as usize]);
         }
 
         Ok(())

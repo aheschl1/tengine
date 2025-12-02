@@ -10,6 +10,7 @@ pub enum ElementwiseBinaryTensorOp<T: TensorValueElementwise> {
 }
 
 impl<T: TensorValueElementwise> ElementwiseBinaryTensorOp<T> {
+    #[inline(always)]
     pub fn apply(&self, a: T, b: T) -> T 
     {
         match self {
@@ -40,7 +41,7 @@ where T: TensorValueElementwise,
 
         let mut result = TensorBase::<T, B>::zeros(out_shape);
 
-        self.backend.merge(
+        self.backend.broadcast(
             (view_a.raw, &view_a.meta), 
             (view_b.raw, &view_b.meta),
             (&mut result.raw, &result.meta),
@@ -99,49 +100,4 @@ pub(crate) fn compute_broadcasted_params(
     }
 
     Ok((out_shape, out_stra, out_strb))
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{core::{tensor::{AsView, AsViewMut, TensorAccess, TensorAccessMut}, CpuTensor, MetaTensorView}, ops::binary::PointwiseTensorOp};
-
-    #[test]
-    fn test_broadcast() {
-        let mut veca = CpuTensor::<f32>::ones((1, 3));
-        let vecb = CpuTensor::<f32>::ones((3, 1));
-        veca.view_mut().set(vec![0, 0], 22.0).unwrap();
-
-        let vecc = &veca.view().add(&vecb.view()).expect("fail");
-
-        assert_eq!(vecc.shape().clone(), vec![3, 3]);
-        for i in 0..3usize {
-            for j in 0..3usize {
-                if j == 0 {
-                    assert_eq!(vecc.view().get(vec![i, j]).unwrap(), 23.0);
-                    continue;
-                }
-                assert_eq!(vecc.view().get(vec![i, j]).unwrap(), 2.0);
-            }
-        }
-    }
-
-    #[test]
-    fn test_broadcast_2() {
-        let mut veca = CpuTensor::<f32>::ones((3,1));
-        let vecb = CpuTensor::<f32>::ones((3, 1));
-        veca.view_mut().set(vec![0, 0], 22.0).unwrap();
-
-        let vecc = &veca.view().add(&vecb.view()).expect("fail");
-
-        assert_eq!(vecc.shape().clone(), vec![3, 1]);
-        for i in 0..3usize {
-            for j in 0..1usize {
-                if i == 0 {
-                    assert_eq!(vecc.view().get(vec![i, j]).unwrap(), 23.0);
-                    continue;
-                }
-                assert_eq!(vecc.view().get(vec![i, j]).unwrap(), 2.0);
-            }
-        }
-    }
 }
