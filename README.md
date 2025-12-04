@@ -36,6 +36,7 @@ Goal is high performance ML stack with minimal dependencies and maximal flexibil
 - [X] perf sucks for non-contiguous memory in unary CUDA - fix
 - [ ] O(rank * size) instead of O(size) broadcasting ops is bad
 - [ ] Broadcast cuda kernel puts a cap on tensor dim size - fix
+- [ ] Idx can be borrow [Dim] to avoid clone
 
 ## Some examples
 
