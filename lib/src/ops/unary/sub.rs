@@ -1,6 +1,6 @@
 use std::{ops::{Sub, SubAssign}};
 
-use crate::{backend::Backend, core::{primitives::TensorBase, tensor::AsTensor, value::TensorValue, TensorView, TensorViewMut}, ops::unary::ElementwiseUnaryTensorOp};
+use crate::{backend::Backend, core::{primitives::TensorBase, tensor::AsTensor, value::TensorValue, TensorView, TensorViewMut}, ops::base::OpType};
 
 impl<'a, T, B> SubAssign<T> for TensorViewMut<'a, T, B> 
     where T: TensorValue,
@@ -9,7 +9,7 @@ impl<'a, T, B> SubAssign<T> for TensorViewMut<'a, T, B>
     fn sub_assign(&mut self, rhs: T) {
         self.backend.apply_elementwise(
             self.raw, 
-            ElementwiseUnaryTensorOp::Sub(rhs),
+            (OpType::Sub, rhs),
             &self.meta
         ).unwrap();
     }
@@ -22,7 +22,7 @@ impl<'a, T, B> SubAssign<&T> for TensorViewMut<'a, T, B>
     fn sub_assign(&mut self, rhs: &T) {
         self.backend.apply_elementwise(
             self.raw, 
-            ElementwiseUnaryTensorOp::Sub(*rhs),
+            (OpType::Sub, *rhs),
             &self.meta
         ).unwrap();
     }
@@ -35,7 +35,7 @@ impl<T, B> SubAssign<T> for TensorBase<T, B>
     fn sub_assign(&mut self, rhs: T) {
         self.backend.apply_elementwise(
             &mut self.raw, 
-            ElementwiseUnaryTensorOp::Sub(rhs),
+            (OpType::Sub, rhs),
             &self.meta
         ).unwrap();
     }
@@ -48,7 +48,7 @@ impl<T, B> SubAssign<&T> for TensorBase<T, B>
     fn sub_assign(&mut self, rhs: &T) {
         self.backend.apply_elementwise(
             &mut self.raw, 
-            ElementwiseUnaryTensorOp::Sub(*rhs),
+            (OpType::Sub, *rhs),
             &self.meta
         ).unwrap();
     }

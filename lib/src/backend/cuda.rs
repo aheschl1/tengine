@@ -2,7 +2,7 @@ use std::sync::{atomic::{AtomicBool, Ordering}, Arc, LazyLock};
 
 use cudarc::driver::{CudaContext, CudaSlice, DevicePtr};
 
-use crate::{backend::Backend, core::{tensor::TensorError, value::TensorValue, MetaTensor}, ops::unary::ElementwiseUnaryTensorOp};
+use crate::{backend::Backend, core::{tensor::TensorError, value::TensorValue, MetaTensor}, ops::{base::OpType}};
 
 // Include bindgen-generated FFI declarations for CUDA kernel launchers
 #[allow(non_camel_case_types)]
@@ -172,13 +172,13 @@ impl<T: TensorValue> Backend<T> for Cuda {
 
         fn apply_elementwise_contiguous(
         &self, buf: &mut Self::Buf, 
-        op: &ElementwiseUnaryTensorOp<T>, 
+        op: (OpType, T), 
         start: usize,
         len: usize
     ) -> Result<(), TensorError> {
         
-        let op_code = op.to_op_code();
-        let value = op.value();
+        let op_code = op.0.to_op_code();
+        let value = op.1;
         let stream = self.stream();
 
         macro_rules! launch_elementwise {
@@ -225,14 +225,14 @@ impl<T: TensorValue> Backend<T> for Cuda {
     
     fn apply_elementwise_1d_strided(
         &self, buf: &mut Self::Buf, 
-        op: &ElementwiseUnaryTensorOp<T>, 
+        op: (OpType, T), 
         start: usize,
         stride: isize,
         len: usize
     ) -> Result<(), TensorError> {
 
-        let op_code = op.to_op_code();
-        let value = op.value();
+        let op_code = op.0.to_op_code();
+        let value = op.1;
         let stream = self.stream();
 
         macro_rules! launch_elementwise {
@@ -278,13 +278,13 @@ impl<T: TensorValue> Backend<T> for Cuda {
     fn apply_elementwise_nd(
         &self,
         buf: &mut Self::Buf,
-        op: &ElementwiseUnaryTensorOp<T>,
+        op: (OpType, T),
         offset: usize,
         shape: &[usize],
         stride: &[isize],
     ) -> Result<(), TensorError> {
-        let op_code = op.to_op_code();
-        let value = op.value();
+        let op_code = op.0.to_op_code();
+        let value = op.1;
         let stream = self.stream();
         let rank = shape.len();
         let size = shape.iter().product::<usize>();
@@ -341,7 +341,7 @@ impl<T: TensorValue> Backend<T> for Cuda {
         left: (*const Self::Buf, &MetaTensor), 
         right: (*const Self::Buf, &MetaTensor),
         dst: (*mut Self::Buf, &MetaTensor),
-        op: crate::ops::binary::ElementwiseBinaryTensorOp<T>
+        op: OpType
     ) -> Result<(), TensorError> {
         let (lbuf, lmeta) = left;
         let (rbuf, rmeta) = right;
@@ -358,9 +358,9 @@ impl<T: TensorValue> Backend<T> for Cuda {
         // let rshape_buf = self.alloc_from_slice(rmeta.shape.0.clone().into_boxed_slice())?;
         let dshape_buf = self.alloc_from_slice(dmeta.shape.0.clone().into_boxed_slice())?;
         
-        let lstride_buf = self.alloc_from_slice(lmeta.stride().clone().into_boxed_slice())?;
-        let rstride_buf = self.alloc_from_slice(rmeta.stride().clone().into_boxed_slice())?;
-        let dstride_buf = self.alloc_from_slice(dmeta.stride().clone().into_boxed_slice())?;
+        let lstride_buf = self.alloc_from_slice(lmeta.strides().clone().into_boxed_slice())?;
+        let rstride_buf = self.alloc_from_slice(rmeta.strides().clone().into_boxed_slice())?;
+        let dstride_buf = self.alloc_from_slice(dmeta.strides().clone().into_boxed_slice())?;
 
         let (lstride_ptr, _) = lstride_buf.ptr.device_ptr(&stream);
         let (rstride_ptr, _) = rstride_buf.ptr.device_ptr(&stream);

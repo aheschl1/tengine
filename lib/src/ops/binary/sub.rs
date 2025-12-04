@@ -1,6 +1,7 @@
 use std::ops::{Sub, SubAssign};
 
-use crate::{backend::Backend, core::{primitives::TensorBase, value::TensorValue, MetaTensor, MetaTensorView, TensorView, TensorViewMut}, ops::binary::{compute_broadcasted_params, ElementwiseBinaryTensorOp}};
+use crate::{backend::Backend, core::{primitives::TensorBase, value::TensorValue, MetaTensor, MetaTensorView, TensorView, TensorViewMut}, ops::binary::{compute_broadcasted_params}};
+use crate::ops::base::OpType;
 
 /// Macro to implement SubAssign for mutable tensor types (TensorBase and TensorViewMut)
 macro_rules! impl_sub_assign {
@@ -31,7 +32,7 @@ macro_rules! impl_sub_assign {
                         (&self.raw as *const B::Buf, &meta_a),
                         (&rhs.raw as *const B::Buf, &meta_b),
                         (&mut self.raw as *mut B::Buf, &meta_a),
-                        ElementwiseBinaryTensorOp::Sub,
+                        OpType::Sub,
                     ).unwrap();
                 }
             }
@@ -64,7 +65,7 @@ macro_rules! impl_sub_assign {
                         (&self.raw as *const B::Buf, &meta_a),
                         (rhs.raw as *const B::Buf, &meta_b),
                         (&mut self.raw as *mut B::Buf, &meta_a),
-                        ElementwiseBinaryTensorOp::Sub,
+                        OpType::Sub,
                     ).unwrap();
                 }
             }
@@ -97,7 +98,7 @@ macro_rules! impl_sub_assign {
                         (self.raw as *const B::Buf, &meta_a),
                         (&rhs.raw as *const B::Buf, &meta_b),
                         (self.raw as *mut B::Buf, &meta_a),
-                        ElementwiseBinaryTensorOp::Sub,
+                        OpType::Sub,
                     ).unwrap();
                 }
             }
@@ -130,7 +131,7 @@ macro_rules! impl_sub_assign {
                         (self.raw as *const B::Buf, &meta_a),
                         (rhs.raw as *const B::Buf, &meta_b),
                         (self.raw as *mut B::Buf, &meta_a),
-                        ElementwiseBinaryTensorOp::Sub,
+                        OpType::Sub,
                     ).unwrap();
                 }
             }
@@ -163,7 +164,7 @@ macro_rules! impl_sub {
                         (&self.raw as *const B::Buf, &meta_a),
                         (&rhs.raw as *const B::Buf, &meta_b),
                         (&mut result.raw as *mut B::Buf, &result.meta),
-                        ElementwiseBinaryTensorOp::Sub,
+                        OpType::Sub,
                     ).unwrap();
                 }
                 result
@@ -193,7 +194,7 @@ macro_rules! impl_sub {
                         (&self.raw as *const B::Buf, &meta_a),
                         (rhs.raw as *const B::Buf, &meta_b),
                         (&mut result.raw as *mut B::Buf, &result.meta),
-                        ElementwiseBinaryTensorOp::Sub,
+                        OpType::Sub,
                     ).unwrap();
                 }
                 result
@@ -223,7 +224,7 @@ macro_rules! impl_sub {
                         (self.raw as *const B::Buf, &meta_a),
                         (&rhs.raw as *const B::Buf, &meta_b),
                         (&mut result.raw as *mut B::Buf, &result.meta),
-                        ElementwiseBinaryTensorOp::Sub,
+                        OpType::Sub,
                     ).unwrap();
                 }
                 result
@@ -253,7 +254,7 @@ macro_rules! impl_sub {
                         (self.raw as *const B::Buf, &meta_a),
                         (rhs.raw as *const B::Buf, &meta_b),
                         (&mut result.raw as *mut B::Buf, &result.meta),
-                        ElementwiseBinaryTensorOp::Sub,
+                        OpType::Sub,
                     ).unwrap();
                 }
                 result
@@ -283,7 +284,7 @@ macro_rules! impl_sub {
                         (&self.raw as *const B::Buf, &meta_a),
                         (&rhs.raw as *const B::Buf, &meta_b),
                         (&mut result.raw as *mut B::Buf, &result.meta),
-                        ElementwiseBinaryTensorOp::Sub,
+                        OpType::Sub,
                     ).unwrap();
                 }
                 result
@@ -313,7 +314,7 @@ macro_rules! impl_sub {
                         (&self.raw as *const B::Buf, &meta_a),
                         (rhs.raw as *const B::Buf, &meta_b),
                         (&mut result.raw as *mut B::Buf, &result.meta),
-                        ElementwiseBinaryTensorOp::Sub,
+                        OpType::Sub,
                     ).unwrap();
                 }
                 result
@@ -343,7 +344,7 @@ macro_rules! impl_sub {
                         (self.raw as *const B::Buf, &meta_a),
                         (&rhs.raw as *const B::Buf, &meta_b),
                         (&mut result.raw as *mut B::Buf, &result.meta),
-                        ElementwiseBinaryTensorOp::Sub,
+                        OpType::Sub,
                     ).unwrap();
                 }
                 result
@@ -373,7 +374,7 @@ macro_rules! impl_sub {
                         (self.raw as *const B::Buf, &meta_a),
                         (rhs.raw as *const B::Buf, &meta_b),
                         (&mut result.raw as *mut B::Buf, &result.meta),
-                        ElementwiseBinaryTensorOp::Sub,
+                        OpType::Sub,
                     ).unwrap();
                 }
                 result

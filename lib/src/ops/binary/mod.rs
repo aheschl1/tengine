@@ -1,43 +1,9 @@
 
-use std::marker::PhantomData;
 
-use crate::core::{tensor::TensorError, value::TensorValue, MetaTensor};
+use crate::core::{tensor::TensorError, MetaTensor};
 pub mod add;
 pub mod sub;
 pub mod mul;
-
-pub enum ElementwiseBinaryTensorOp<T: TensorValue> {
-    Add,
-    Sub,
-    Mul,
-    _P(PhantomData<T>)
-}
-
-impl<T: TensorValue> ElementwiseBinaryTensorOp<T> {
-    #[inline(always)]
-    pub fn apply(&self, a: T, b: T) -> T 
-    {
-        match self {
-            ElementwiseBinaryTensorOp::Add => a + b,
-            ElementwiseBinaryTensorOp::Sub => a - b,
-            ElementwiseBinaryTensorOp::Mul => a * b,
-            _ => panic!("Unsupported operation"),
-        }
-    }
-}
-
-#[cfg(feature = "cuda")]
-impl<T: TensorValue> ElementwiseBinaryTensorOp<T> {
-    #[inline(always)]
-    pub fn to_op_code(&self) -> u8 {
-        match self {
-            ElementwiseBinaryTensorOp::Add => 0,
-            ElementwiseBinaryTensorOp::Sub => 1,
-            ElementwiseBinaryTensorOp::Mul => 2,
-            _ => panic!("Unsupported operation"),
-        }
-    }
-}
 
 pub(crate) fn compute_broadcasted_params(
     a: &MetaTensor,
@@ -45,8 +11,8 @@ pub(crate) fn compute_broadcasted_params(
 ) -> Result<(Vec<usize>, Vec<isize>, Vec<isize>), TensorError>{
     let mut sa: Vec<usize> = a.shape().clone().into();
     let mut sb: Vec<usize> = b.shape().clone().into();
-    let mut stra: Vec<isize> = a.stride().clone();
-    let mut strb: Vec<isize> = b.stride().clone();
+    let mut stra: Vec<isize> = a.strides().clone();
+    let mut strb: Vec<isize> = b.strides().clone();
 
     if sa.len() < sb.len() {
         let pad = sb.len() - sa.len();

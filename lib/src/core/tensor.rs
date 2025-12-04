@@ -179,7 +179,7 @@ where B: Backend<T>, V: AsView<T, B>
     /// - `IdxOutOfBounds` if the computed buffer index is outside the backing slice.
     fn get<'a, I: Into<Idx<'a>>>(&self, idx: I) -> Result<T, TensorError> {
         let view = self.view();
-        let idx = logical_to_buffer_idx(&idx.into(), view.meta.stride(), view.meta.offset())?;
+        let idx = logical_to_buffer_idx(&idx.into(), view.meta.strides(), view.meta.offset())?;
         view.backend.read(view.raw, idx)
     }
 
@@ -193,7 +193,7 @@ where B: Backend<T>, V: AsView<T, B>
         let view = self.view();
         let (new_shape, new_stride, offset) = compute_sliced_parameters(
             view.meta.shape(), 
-            view.meta.stride(), 
+            view.meta.strides(), 
             view.meta.offset(),
             dim, 
             idx
@@ -216,7 +216,7 @@ where V: AsViewMut<T, B>
     fn slice_mut<S: Into<Slice>>(&mut self, dim: Dim, idx: S) -> Result<TensorViewMut<'_, T, B>, TensorError> {
         let view = self.view_mut();
         let (new_shape, new_stride, offset) =
-            compute_sliced_parameters(view.meta.shape(), view.meta.stride(), view.meta.offset(), dim, idx)?;
+            compute_sliced_parameters(view.meta.shape(), view.meta.strides(), view.meta.offset(), dim, idx)?;
     
         Ok(TensorViewMut::from_parts(view.raw, view.backend, MetaTensor::new(new_shape, new_stride, offset)))
     }
@@ -224,7 +224,7 @@ where V: AsViewMut<T, B>
     fn set<'a, I: Into<Idx<'a>>>(&mut self, idx: I, value: T) -> Result<(), TensorError> {
         let view = self.view_mut();
         let idx = idx.into();
-        let buf_idx = logical_to_buffer_idx(&idx, view.meta.stride(), view.meta.offset())?;
+        let buf_idx = logical_to_buffer_idx(&idx, view.meta.strides(), view.meta.offset())?;
         view.backend.write(view.raw, buf_idx, value)
     }
 

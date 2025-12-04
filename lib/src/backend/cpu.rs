@@ -1,5 +1,5 @@
 
-use crate::{backend::Backend, core::{meta::TensorOffsetIterator, tensor::TensorError, value::TensorValue, MetaTensor}, ops::{binary::ElementwiseBinaryTensorOp, unary::ElementwiseUnaryTensorOp}};
+use crate::{backend::Backend, core::{meta::TensorOffsetIterator, tensor::TensorError, value::TensorValue, MetaTensor}, ops::base::OpType};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Cpu;
@@ -62,20 +62,20 @@ impl<T: TensorValue> Backend<T> for Cpu {
 
         fn apply_elementwise_contiguous(
         &self, buf: &mut Self::Buf, 
-        op: &ElementwiseUnaryTensorOp<T>, 
+        op: (OpType, T), 
         start: usize,
         len: usize
     ) -> Result<(), TensorError> {
         let bufptr = buf.as_mut();
         for item in bufptr.iter_mut().skip(start).take(len) {
-            *item = op.apply(*item);
+            *item = op.0.apply(*item, op.1);
         }
         Ok(())
     }
     
     fn apply_elementwise_1d_strided(
         &self, buf: &mut Self::Buf, 
-        op: &ElementwiseUnaryTensorOp<T>, 
+        op: (OpType, T), 
         offset: usize,
         stride: isize,
         len: usize
@@ -83,7 +83,7 @@ impl<T: TensorValue> Backend<T> for Cpu {
         let bufptr = buf.as_mut();
         let mut idx: isize = offset as isize;
         for _ in 0..len {
-            bufptr[idx as usize] = op.apply(bufptr[idx as usize]);
+            bufptr[idx as usize] = op.0.apply(bufptr[idx as usize], op.1);
             idx += stride;
         }
         Ok(())
@@ -92,7 +92,7 @@ impl<T: TensorValue> Backend<T> for Cpu {
     fn apply_elementwise_nd(
         &self,
         buf: &mut Self::Buf,
-        op: &ElementwiseUnaryTensorOp<T>,
+        op: (OpType, T),
         offset: usize,
         shape: &[usize],
         stride: &[isize],
@@ -104,7 +104,7 @@ impl<T: TensorValue> Backend<T> for Cpu {
             offset,
         );
         for idx in iterator {
-            bufptr[idx] = op.apply(bufptr[idx]);
+            bufptr[idx] = op.0.apply(bufptr[idx], op.1);
         }
         Ok(())
     }
@@ -114,7 +114,7 @@ impl<T: TensorValue> Backend<T> for Cpu {
         left: (*const Self::Buf, &MetaTensor), 
         right: (*const Self::Buf, &MetaTensor),
         dst: (*mut Self::Buf, &MetaTensor),
-        op: ElementwiseBinaryTensorOp<T>
+        op: OpType
     ) -> Result<(), TensorError> {
         // this is a stupid algorithm which is O(rank*size)
         // it can be optimized to O(size) later
@@ -126,9 +126,9 @@ impl<T: TensorValue> Backend<T> for Cpu {
 
         let rank = dst_meta.rank();
 
-        let sl = left_meta.stride();
-        let sr = right_meta.stride();
-        let sd = dst_meta.stride();
+        let sl = left_meta.strides();
+        let sr = right_meta.strides();
+        let sd = dst_meta.strides();
 
         
         let mut ol = left_meta.offset() as isize;

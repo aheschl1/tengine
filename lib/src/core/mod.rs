@@ -1351,7 +1351,7 @@ mod tests {
         let stride = super::shape_to_stride(&shape.clone().into());
         let meta = MetaTensor::new(shape.clone(), stride.clone(), 0);
         assert_eq!(meta.shape(), &shape);
-        assert_eq!(meta.stride(), &stride);
+        assert_eq!(meta.strides(), &stride);
         assert_eq!(meta.offset(), 0);
         assert_eq!(meta.dims(), 2);
         assert_eq!(meta.dim(0), 2);

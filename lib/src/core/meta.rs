@@ -65,18 +65,18 @@ impl PartialEq<Vec<Dim>> for Shape {
 pub struct MetaTensor {
     pub shape: Shape,
     /// Affine matrix wo offset
-    pub stride: Stride,
+    pub strides: Stride,
     pub offset: usize,
 }
 
 impl MetaTensor {
     /// Creates tensor metadata with explicit shape, stride and offset.
     pub fn new(shape: impl Into<Shape>, stride: Stride, offset: usize) -> Self {
-        Self { shape: shape.into(), stride, offset }
+        Self { shape: shape.into(), strides: stride, offset }
     }
 
     /// Returns true when the metadata describes a scalar (rank 0).
-    pub fn is_scalar(&self) -> bool { self.stride.is_empty() }
+    pub fn is_scalar(&self) -> bool { self.strides.is_empty() }
     /// Returns true when the metadata describes a 1xN row tensor.
     pub fn is_row(&self) -> bool { self.shape.len() == 2 && self.shape[0] == 1 }
     /// Returns true when the metadata describes a 1-D column tensor.
@@ -87,11 +87,11 @@ impl MetaTensor {
     pub fn size(&self) -> usize { self.shape.iter().product() }
     /// Whether the layout is contiguous in row-major order, allowing strides of
     /// one for non-singleton dims and ignoring dims of size 1.
-    pub fn is_contiguous(&self) -> bool { is_contiguous_relaxed(&self.shape, &self.stride) }
+    pub fn is_contiguous(&self) -> bool { is_contiguous_relaxed(&self.shape, &self.strides) }
     /// Borrow the shape vector.
     pub fn shape(&self) -> &Shape { &self.shape }
     /// Borrow the stride vector.
-    pub fn stride(&self) -> &Stride { &self.stride }
+    pub fn strides(&self) -> &Stride { &self.strides }
     /// Return the starting offset (in elements) into the underlying buffer.
     pub fn offset(&self) -> usize { self.offset }
     /// Returns the size of a single dimension by index.
@@ -100,7 +100,7 @@ impl MetaTensor {
     /// Returns an iterator over all offsets in the underlying buffer for this tensor/view.
     pub fn iter_offsets(&self) -> impl Iterator<Item = usize> + '_ {
         let offset = self.offset;
-        TensorOffsetIterator::new(self.shape.as_slice(), self.stride.as_slice(), offset)
+        TensorOffsetIterator::new(self.shape.as_slice(), self.strides.as_slice(), offset)
     }
     pub fn iter_coords(&self) -> impl Iterator<Item = Vec<usize>> + '_ {
         CoordIter::new(self.shape.as_slice())
@@ -116,7 +116,7 @@ impl MetaTensor {
         }
 
         let mut offset = self.offset as isize;
-        for (c, stride) in coords.iter().zip(self.stride.iter()) {
+        for (c, stride) in coords.iter().zip(self.strides.iter()) {
             offset += *c as isize * *stride;
         }
 
@@ -284,7 +284,7 @@ pub trait MetaTensorView {
     /// Borrow the shape vector.
     fn shape(&self) -> &Shape { &self.meta().shape }
     /// Borrow the stride vector.
-    fn stride(&self) -> &Stride { &self.meta().stride }
+    fn stride(&self) -> &Stride { &self.meta().strides }
     /// Starting offset (in elements) into the underlying buffer.
     fn offset(&self) -> usize { self.meta().offset }
     /// Number of dimensions (rank).

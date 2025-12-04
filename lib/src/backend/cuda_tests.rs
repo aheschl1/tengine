@@ -216,7 +216,7 @@ mod tests {
         let view = tensor.view();
         let slice = view.slice(0, 0..0).unwrap();
         assert_eq!(*slice.meta.shape(), vec![3]);
-        assert_eq!(*slice.meta.stride(), vec![1]);
+        assert_eq!(*slice.meta.strides(), vec![1]);
         assert_eq!(index_tensor(Idx::At(0), &slice).unwrap(), 1);
         assert_eq!(index_tensor(Idx::At(1), &slice).unwrap(), 2);
         assert_eq!(index_tensor(Idx::At(2), &slice).unwrap(), 3);
@@ -224,7 +224,7 @@ mod tests {
         let view = tensor.view();
         let slice2 = view.slice(1, 0..0).unwrap();
         assert_eq!(*slice2.meta.shape(), vec![2]);
-        assert_eq!(*slice2.meta.stride(), vec![3]);
+        assert_eq!(*slice2.meta.strides(), vec![3]);
         assert_eq!(index_tensor(Idx::At(0), &slice2).unwrap(), 1);
         assert_eq!(index_tensor(Idx::Coord(&[1]), &slice2).unwrap(), 4);
         assert_eq!(index_tensor(Idx::At(1), &slice2).unwrap(), 4);
@@ -239,7 +239,7 @@ mod tests {
         let view = tensor.view();
         let slice = view.slice(0, 0..0).unwrap();
         assert_eq!(*slice.meta.shape(), vec![2, 2]);
-        assert_eq!(*slice.meta.stride(), vec![2, 1]);
+        assert_eq!(*slice.meta.strides(), vec![2, 1]);
         assert_eq!(index_tensor(Idx::Coord(&[0, 0]), &slice).unwrap(), 1);
         assert_eq!(index_tensor(Idx::Coord(&[0, 1]), &slice).unwrap(), 2);
         assert_eq!(index_tensor(Idx::Coord(&[1, 0]), &slice).unwrap(), 4);
@@ -248,7 +248,7 @@ mod tests {
         let view = tensor.view();
         let slice_second_depth = view.slice(0, 1..1).unwrap();
         assert_eq!(*slice_second_depth.meta.shape(), vec![2, 2]);
-        assert_eq!(*slice_second_depth.meta.stride(), vec![2, 1]);
+        assert_eq!(*slice_second_depth.meta.strides(), vec![2, 1]);
         assert_eq!(index_tensor(Idx::Coord(&[0, 0]), &slice_second_depth).unwrap(), 6);
         assert_eq!(index_tensor(Idx::Coord(&[0, 1]), &slice_second_depth).unwrap(), 7);
         assert_eq!(index_tensor(Idx::Coord(&[1, 0]), &slice_second_depth).unwrap(), 8);
@@ -257,7 +257,7 @@ mod tests {
         let view = tensor.view();
         let slice2 = view.slice(1, 0..0).unwrap();
         assert_eq!(*slice2.meta.shape(), vec![2, 2]);
-        assert_eq!(*slice2.meta.stride(), vec![4, 1]);
+        assert_eq!(*slice2.meta.strides(), vec![4, 1]);
         assert_eq!(index_tensor(Idx::Coord(&[0, 0]), &slice2).unwrap(), 1);
         assert_eq!(index_tensor(Idx::Coord(&[0, 1]), &slice2).unwrap(), 2);
         assert_eq!(index_tensor(Idx::Coord(&[1, 0]), &slice2).unwrap(), 6);
@@ -266,7 +266,7 @@ mod tests {
         let view = tensor.view();
         let slice3 = view.slice(2, 0..0).unwrap();
         assert_eq!(*slice3.meta.shape(), vec![2, 2]);
-        assert_eq!(*slice3.meta.stride(), vec![4, 2]);
+        assert_eq!(*slice3.meta.strides(), vec![4, 2]);
         assert_eq!(index_tensor(Idx::Coord(&[0, 0]), &slice3).unwrap(), 1);
         assert_eq!(index_tensor(Idx::Coord(&[0, 1]), &slice3).unwrap(), 4);
         assert_eq!(index_tensor(Idx::Coord(&[1, 0]), &slice3).unwrap(), 6);

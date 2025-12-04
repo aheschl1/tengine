@@ -1,6 +1,6 @@
 
 
-use crate::{core::{tensor::TensorError, value::{TensorValue}, MetaTensor, MetaTensorView}, ops::{binary::ElementwiseBinaryTensorOp, unary::ElementwiseUnaryTensorOp}};
+use crate::{core::{tensor::TensorError, value::TensorValue, MetaTensor, MetaTensorView}, ops::{base::OpType}};
 
 pub mod cpu;
 
@@ -9,7 +9,7 @@ pub mod cuda;
 #[cfg(feature = "cuda")]
 pub mod cuda_tests;
 
-pub trait Backend<T: TensorValue> {
+pub(crate) trait Backend<T: TensorValue> {
     type Buf;
 
     fn alloc_from_slice(&self, src: Box<[T]>) -> Result<Self::Buf, TensorError>;
@@ -24,14 +24,14 @@ pub trait Backend<T: TensorValue> {
 
     fn apply_elementwise_contiguous(
         &self, buf: &mut Self::Buf, 
-        op: &ElementwiseUnaryTensorOp<T>, 
+        op: (OpType, T), 
         start: usize,
         len: usize
     ) -> Result<(), TensorError>;
 
     fn apply_elementwise_1d_strided(
         &self, buf: &mut Self::Buf, 
-        op: &ElementwiseUnaryTensorOp<T>, 
+        op: (OpType, T), 
         offset: usize,
         stride: isize,
         len: usize
@@ -40,7 +40,7 @@ pub trait Backend<T: TensorValue> {
     fn apply_elementwise_nd(
         &self,
         buf: &mut Self::Buf,
-        op: &ElementwiseUnaryTensorOp<T>,
+        op: (OpType, T),
         offset: usize,
         shape: &[usize],
         stride: &[isize],
@@ -58,12 +58,12 @@ pub trait Backend<T: TensorValue> {
         left: (*const Self::Buf, &MetaTensor), 
         right: (*const Self::Buf, &MetaTensor),
         dst: (*mut Self::Buf, &MetaTensor),
-        op: ElementwiseBinaryTensorOp<T>
+        op: OpType
     ) -> Result<(), TensorError>;
 
-    fn apply_elementwise(&self, buf: &mut Self::Buf, op: ElementwiseUnaryTensorOp<T>, meta: &MetaTensor) -> Result<(), TensorError> {
+    fn apply_elementwise(&self, buf: &mut Self::Buf, op: (OpType, T), meta: &MetaTensor) -> Result<(), TensorError> {
         if meta.is_contiguous() {
-            return self.apply_elementwise_contiguous(buf, &op, meta.offset, meta.size())
+            return self.apply_elementwise_contiguous(buf, op, meta.offset, meta.size())
         }
 
         let non_singleton_dims = meta.non_singleton_dims();
@@ -73,7 +73,7 @@ pub trait Backend<T: TensorValue> {
             let (_, dim_size, dim_stride) = non_singleton_dims[0];
             return self.apply_elementwise_1d_strided(
                 buf, 
-                &op, 
+                op, 
                 meta.offset, 
                 dim_stride, 
                 dim_size
@@ -84,10 +84,10 @@ pub trait Backend<T: TensorValue> {
         // better than a full gather scatter
         self.apply_elementwise_nd(
             buf,
-            &op,
+            op,
             meta.offset,
             meta.shape.as_slice(),
-            &meta.stride,
+            &meta.strides,
         )
 
     }
