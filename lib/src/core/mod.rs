@@ -259,8 +259,7 @@ mod tests {
         let shape = vec![4, 2];
         let mut tensor = make_tensor(buf, shape);
         
-        let mut view = tensor.view_mut();
-        let mut slice = view.slice_mut(0, 1..3).unwrap(); // Rows 1 and 2
+        let mut slice = tensor.slice_mut(0, 1..3).unwrap(); // Rows 1 and 2
         assert_eq!(*slice.shape(), vec![2, 2]);
         
         // Modify values in the slice

@@ -167,7 +167,7 @@ mod tests {
         assert_eq!(index_tensor(Idx::At(1), &tensor.view()).unwrap(), 2);
         assert_eq!(index_tensor(Idx::At(2), &tensor.view()).unwrap(), 3);
 
-        tensor.view_mut().set(&Idx::At(1), 10).unwrap();
+        tensor.set(&Idx::At(1), 10).unwrap();
         assert_eq!(index_tensor(Idx::At(1), &tensor.view()).unwrap(), 10);
     }
 
@@ -203,7 +203,7 @@ mod tests {
         assert_eq!(index_tensor(Idx::Coord(&[1, 1, 0]), &tensor.view()).unwrap(), 8);
         assert_eq!(index_tensor(Idx::Coord(&[1, 1, 1]), &tensor.view()).unwrap(), 9);
 
-        tensor.view_mut().set(&Idx::Coord(&[1, 0, 0]), 67).unwrap();
+        tensor.set(&Idx::Coord(&[1, 0, 0]), 67).unwrap();
         assert_eq!(index_tensor(Idx::Coord(&[1, 0, 0]), &tensor.view()).unwrap(), 67);
     }
 
@@ -334,75 +334,6 @@ mod tests {
         assert_eq!(index_tensor(Idx::Coord(&[1, 1]), &tensor.view()).unwrap(), 50);
     }
 
-    // #[test]
-    // fn test_cuda_view_as_owned_success() {
-    //     let buf = vec![1, 2, 3, 4, 5, 6];
-    //     let shape = vec![2, 3];
-    //     let tensor = make_cuda_tensor(buf, shape);
-    //     let reshaped = tensor.view().view_as(vec![3, 2]).unwrap();
-        
-    //     assert_eq!(*reshaped.meta.shape(), vec![3, 2]);
-    //     assert_eq!(*reshaped.meta.stride(), vec![2, 1]);
-    //     assert_eq!(index_tensor(Idx::Coord(&[0, 0]), &reshaped).unwrap(), 1);
-    //     assert_eq!(index_tensor(Idx::Coord(&[0, 1]), &reshaped).unwrap(), 2);
-    //     assert_eq!(index_tensor(Idx::Coord(&[1, 0]), &reshaped).unwrap(), 3);
-    //     assert_eq!(index_tensor(Idx::Coord(&[1, 1]), &reshaped).unwrap(), 4);
-    //     assert_eq!(index_tensor(Idx::Coord(&[2, 0]), &reshaped).unwrap(), 5);
-    //     assert_eq!(index_tensor(Idx::Coord(&[2, 1]), &reshaped).unwrap(), 6);
-    // }
-
-    // #[test]
-    // fn test_cuda_view_as_owned_error() {
-    //     let buf = vec![1, 2, 3, 4, 5, 6];
-    //     let shape = vec![2, 3];
-    //     let tensor = make_cuda_tensor(buf, shape);
-    //     assert!(matches!(tensor.view().view_as(vec![4, 2]), Err(TensorError::InvalidShape)));
-    // }
-
-    // #[test]
-    // fn test_cuda_view_as_slice_success() {
-    //     let buf = vec![1, 2, 3, 4, 5, 6];
-    //     let shape = vec![2, 3];
-    //     let tensor = make_cuda_tensor(buf, shape);
-
-    //     let view = tensor.view();
-    //     let slice = view.slice(0, 1..1).unwrap();
-    //     assert_eq!(*slice.meta.shape(), vec![3]);
-    //     let reshaped = slice.view_as(vec![1, 3]).unwrap();
-    //     assert_eq!(*reshaped.meta.shape(), vec![1, 3]);
-    //     assert_eq!(*reshaped.meta.stride(), vec![3, 1]);
-    //     assert_eq!(index_tensor(Idx::Coord(&[0, 0]), &reshaped).unwrap(), 4);
-    //     assert_eq!(index_tensor(Idx::Coord(&[0, 1]), &reshaped).unwrap(), 5);
-    //     assert_eq!(index_tensor(Idx::Coord(&[0, 2]), &reshaped).unwrap(), 6);
-    // }
-
-    // #[test]
-    // fn test_cuda_view_as_mut_view_modify() {
-    //     let buf = vec![1, 2, 3, 4];
-    //     let shape = vec![2, 2];
-    //     let mut tensor = make_cuda_tensor(buf, shape);
-    //     let mut view_mut = tensor.view_mut();
-    //     view_mut.set(&Idx::Coord(&[1, 0]), 40).unwrap();
-    //     let reshaped = view_mut.view_as(vec![4]).unwrap();
-    //     assert_eq!(*reshaped.meta.shape(), vec![4]);
-    //     assert_eq!(*reshaped.meta.stride(), vec![1]);
-    //     assert_eq!(index_tensor(Idx::At(2), &reshaped).unwrap(), 40);
-    // }
-
-    // #[test]
-    // fn test_cuda_view_as_scalar() {
-    //     let tensor = CudaTensor::scalar(99);
-    //     let view1 = tensor.view();
-    //     assert_eq!(*view1.meta.shape(), vec![]);
-    //     let reshaped = view1.view_as(vec![1]).unwrap();
-    //     assert_eq!(*reshaped.meta.shape(), vec![1]);
-    //     assert_eq!(*reshaped.meta.stride(), vec![1]);
-    //     assert_eq!(index_tensor(Idx::At(0), &reshaped).unwrap(), 99);
-
-    //     let r2 = reshaped.view_as(vec![1, 1, 1]).unwrap();
-    //     assert_eq!(index_tensor(Idx::Coord(&[0, 0, 0]), &r2).unwrap(), 99);
-    // }
-
     #[test]
     fn test_cuda_from_buf_error() {
         let buf = vec![1, 2, 3, 4];
@@ -417,7 +348,7 @@ mod tests {
     fn test_cuda_get_errors() {
         let tensor = make_cuda_tensor(vec![1, 2, 3, 4], vec![2, 2]);
         assert!(matches!(
-            tensor.view().get(vec![0, 0, 0]),
+            tensor.get(vec![0, 0, 0]),
             Err(TensorError::WrongDims)
         ));
         assert!(matches!(
