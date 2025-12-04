@@ -15,7 +15,6 @@ impl OpType {
             Self::Add => 0,
             Self::Sub => 1,
             Self::Mul => 2,
-            _ => panic!("Unsupported operation"),
         }
     }
 }
@@ -28,7 +27,6 @@ impl OpType {
             Self::Add => a + b,
             Self::Sub => a - b,
             Self::Mul => a * b,
-            _ => panic!("Unsupported operation"),
         }
     }
 }
