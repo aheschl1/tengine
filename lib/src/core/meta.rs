@@ -239,7 +239,8 @@ impl<'a> Iterator for CoordIter<'a> {
         }
 
         self.done = true;
-        Some(self.coords.clone())
+        // Some(self.coords.clone())
+        None
     }
 }
 

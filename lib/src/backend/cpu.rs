@@ -109,11 +109,11 @@ impl<T: TensorValue> Backend<T> for Cpu {
         Ok(())
     }
 
-    fn broadcast(
+    unsafe fn broadcast(
         &self, 
-        left: (&Self::Buf, &MetaTensor), 
-        right: (&Self::Buf, &MetaTensor),
-        dst: (&mut Self::Buf, &MetaTensor),
+        left: (*const Self::Buf, &MetaTensor), 
+        right: (*const Self::Buf, &MetaTensor),
+        dst: (*mut Self::Buf, &MetaTensor),
         op: ElementwiseBinaryTensorOp<T>
     ) -> Result<(), TensorError> {
         // this is a stupid algorithm which is O(rank*size)
@@ -130,15 +130,20 @@ impl<T: TensorValue> Backend<T> for Cpu {
         let sr = right_meta.stride();
         let sd = dst_meta.stride();
 
+        
         let mut ol = left_meta.offset() as isize;
         let mut or = right_meta.offset() as isize;
         let mut od = dst_meta.offset() as isize;
+
+        // println!("Strides: left: {:?}, right: {:?}, dst: {:?}", sl, sr, sd);
+        // println!("Offsets: left: {}, right: {}, dst: {}", ol, or, od);
 
         let mut coords = vec![0; rank];
 
         let mut first = true;
 
         for new_coord in dst_meta.iter_coords() {
+            // println!("Coords: {:?}", new_coord);
             if first {
                 first = false;
             } else{
@@ -155,7 +160,12 @@ impl<T: TensorValue> Backend<T> for Cpu {
             debug_assert!(od >= 0);
             debug_assert!(ol >= 0);
             debug_assert!(or >= 0);
-            dst_buf[od as usize] = op.apply(left_buf[ol as usize], right_buf[or as usize]);
+            // dst_buf[od as usize] = op.apply(left_buf[ol as usize], right_buf[or as usize]);
+            unsafe {
+                let lval = (*left_buf)[ol as usize];
+                let rval = (*right_buf)[or as usize];
+                (*dst_buf)[od as usize] = op.apply(lval, rval);
+            }
         }
 
         Ok(())

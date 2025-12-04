@@ -1,0 +1,489 @@
+use std::ops::{Sub, SubAssign};
+
+use crate::{backend::Backend, core::{primitives::TensorBase, value::TensorValue, MetaTensor, MetaTensorView, TensorView, TensorViewMut}, ops::binary::{compute_broadcasted_params, ElementwiseBinaryTensorOp}};
+
+/// Macro to implement SubAssign for mutable tensor types (TensorBase and TensorViewMut)
+macro_rules! impl_sub_assign {
+    // For owned TensorBase with owned RHS
+    (TensorBase, $rhs_type:ty, owned) => {
+        impl<T, B> SubAssign<$rhs_type> for TensorBase<T, B>
+        where
+            T: TensorValue,
+            B: Backend<T>,
+        {
+            fn sub_assign(&mut self, rhs: $rhs_type) {
+                let (out_shape, broadcast_stra, broadcast_strb) =
+                    compute_broadcasted_params(&self.meta, &rhs.meta)
+                        .expect("Shapes are not broadcastable");
+                
+                if self.meta.shape != out_shape {
+                    panic!(
+                        "Incompatible shapes for in-place subtraction: {:?} does not broadcast to {:?}",
+                        rhs.meta.shape.0, self.meta.shape
+                    );
+                }
+                
+                let meta_a = MetaTensor::new(out_shape.clone(), broadcast_stra, self.offset());
+                let meta_b = MetaTensor::new(out_shape.clone(), broadcast_strb, rhs.offset());
+
+                unsafe {
+                    self.backend.broadcast(
+                        (&self.raw as *const B::Buf, &meta_a),
+                        (&rhs.raw as *const B::Buf, &meta_b),
+                        (&mut self.raw as *mut B::Buf, &meta_a),
+                        ElementwiseBinaryTensorOp::Sub,
+                    ).unwrap();
+                }
+            }
+        }
+    };
+    // For owned TensorBase with view RHS
+    (TensorBase, $rhs_type:ty, view) => {
+        impl<T, B> SubAssign<$rhs_type> for TensorBase<T, B>
+        where
+            T: TensorValue,
+            B: Backend<T>,
+        {
+            fn sub_assign(&mut self, rhs: $rhs_type) {
+                let (out_shape, broadcast_stra, broadcast_strb) =
+                    compute_broadcasted_params(&self.meta, &rhs.meta)
+                        .expect("Shapes are not broadcastable");
+                
+                if self.meta.shape != out_shape {
+                    panic!(
+                        "Incompatible shapes for in-place subtraction: {:?} does not broadcast to {:?}",
+                        rhs.meta.shape.0, self.meta.shape
+                    );
+                }
+                
+                let meta_a = MetaTensor::new(out_shape.clone(), broadcast_stra, self.offset());
+                let meta_b = MetaTensor::new(out_shape.clone(), broadcast_strb, rhs.offset());
+
+                unsafe {
+                    self.backend.broadcast(
+                        (&self.raw as *const B::Buf, &meta_a),
+                        (rhs.raw as *const B::Buf, &meta_b),
+                        (&mut self.raw as *mut B::Buf, &meta_a),
+                        ElementwiseBinaryTensorOp::Sub,
+                    ).unwrap();
+                }
+            }
+        }
+    };
+    // For TensorViewMut with owned RHS
+    (TensorViewMut, $rhs_type:ty, owned) => {
+        impl<'a, T, B> SubAssign<$rhs_type> for TensorViewMut<'a, T, B>
+        where
+            T: TensorValue,
+            B: Backend<T>,
+        {
+            fn sub_assign(&mut self, rhs: $rhs_type) {
+                let (out_shape, broadcast_stra, broadcast_strb) =
+                    compute_broadcasted_params(&self.meta, &rhs.meta)
+                        .expect("Shapes are not broadcastable");
+                
+                if self.meta.shape != out_shape {
+                    panic!(
+                        "Incompatible shapes for in-place subtraction: {:?} does not broadcast to {:?}",
+                        rhs.meta.shape.0, self.meta.shape
+                    );
+                }
+                
+                let meta_a = MetaTensor::new(out_shape.clone(), broadcast_stra, self.offset());
+                let meta_b = MetaTensor::new(out_shape.clone(), broadcast_strb, rhs.offset());
+
+                unsafe {
+                    self.backend.broadcast(
+                        (self.raw as *const B::Buf, &meta_a),
+                        (&rhs.raw as *const B::Buf, &meta_b),
+                        (self.raw as *mut B::Buf, &meta_a),
+                        ElementwiseBinaryTensorOp::Sub,
+                    ).unwrap();
+                }
+            }
+        }
+    };
+    // For TensorViewMut with view RHS
+    (TensorViewMut, $rhs_type:ty, view) => {
+        impl<'a, T, B> SubAssign<$rhs_type> for TensorViewMut<'a, T, B>
+        where
+            T: TensorValue,
+            B: Backend<T>,
+        {
+            fn sub_assign(&mut self, rhs: $rhs_type) {
+                let (out_shape, broadcast_stra, broadcast_strb) =
+                    compute_broadcasted_params(&self.meta, &rhs.meta)
+                        .expect("Shapes are not broadcastable");
+                
+                if self.meta.shape != out_shape {
+                    panic!(
+                        "Incompatible shapes for in-place subtraction: {:?} does not broadcast to {:?}",
+                        rhs.meta.shape.0, self.meta.shape
+                    );
+                }
+                
+                let meta_a = MetaTensor::new(out_shape.clone(), broadcast_stra, self.offset());
+                let meta_b = MetaTensor::new(out_shape.clone(), broadcast_strb, rhs.offset());
+
+                unsafe {
+                    self.backend.broadcast(
+                        (self.raw as *const B::Buf, &meta_a),
+                        (rhs.raw as *const B::Buf, &meta_b),
+                        (self.raw as *mut B::Buf, &meta_a),
+                        ElementwiseBinaryTensorOp::Sub,
+                    ).unwrap();
+                }
+            }
+        }
+    };
+}
+
+/// Macro to implement Sub for all tensor type combinations
+macro_rules! impl_sub {
+    // For owned types (TensorBase) consuming self with owned RHS
+    (TensorBase, $rhs_type:ty, owned) => {
+        impl<T, B> Sub<$rhs_type> for TensorBase<T, B>
+        where
+            T: TensorValue,
+            B: Backend<T>,
+        {
+            type Output = TensorBase<T, B>;
+
+            fn sub(self, rhs: $rhs_type) -> Self::Output {
+                let (out_shape, broadcast_stra, broadcast_strb) =
+                    compute_broadcasted_params(&self.meta, &rhs.meta).unwrap();
+                
+                let meta_a = MetaTensor::new(out_shape.clone(), broadcast_stra, self.offset());
+                let meta_b = MetaTensor::new(out_shape.clone(), broadcast_strb, rhs.offset());
+                
+                let mut result = TensorBase::<T, B>::zeros(out_shape);
+
+                unsafe {
+                    self.backend.broadcast(
+                        (&self.raw as *const B::Buf, &meta_a),
+                        (&rhs.raw as *const B::Buf, &meta_b),
+                        (&mut result.raw as *mut B::Buf, &result.meta),
+                        ElementwiseBinaryTensorOp::Sub,
+                    ).unwrap();
+                }
+                result
+            }
+        }
+    };
+    // For owned types (TensorBase) consuming self with view RHS
+    (TensorBase, $rhs_type:ty, view) => {
+        impl<T, B> Sub<$rhs_type> for TensorBase<T, B>
+        where
+            T: TensorValue,
+            B: Backend<T>,
+        {
+            type Output = TensorBase<T, B>;
+
+            fn sub(self, rhs: $rhs_type) -> Self::Output {
+                let (out_shape, broadcast_stra, broadcast_strb) =
+                    compute_broadcasted_params(&self.meta, &rhs.meta).unwrap();
+                
+                let meta_a = MetaTensor::new(out_shape.clone(), broadcast_stra, self.offset());
+                let meta_b = MetaTensor::new(out_shape.clone(), broadcast_strb, rhs.offset());
+                
+                let mut result = TensorBase::<T, B>::zeros(out_shape);
+
+                unsafe {
+                    self.backend.broadcast(
+                        (&self.raw as *const B::Buf, &meta_a),
+                        (rhs.raw as *const B::Buf, &meta_b),
+                        (&mut result.raw as *mut B::Buf, &result.meta),
+                        ElementwiseBinaryTensorOp::Sub,
+                    ).unwrap();
+                }
+                result
+            }
+        }
+    };
+    // For view types with owned RHS
+    ($lhs_type:ident, $rhs_type:ty, owned) => {
+        impl<'a, T, B> Sub<$rhs_type> for $lhs_type<'a, T, B>
+        where
+            T: TensorValue,
+            B: Backend<T>,
+        {
+            type Output = TensorBase<T, B>;
+
+            fn sub(self, rhs: $rhs_type) -> Self::Output {
+                let (out_shape, broadcast_stra, broadcast_strb) =
+                    compute_broadcasted_params(&self.meta, &rhs.meta).unwrap();
+                
+                let meta_a = MetaTensor::new(out_shape.clone(), broadcast_stra, self.offset());
+                let meta_b = MetaTensor::new(out_shape.clone(), broadcast_strb, rhs.offset());
+                
+                let mut result = TensorBase::<T, B>::zeros(out_shape);
+
+                unsafe {
+                    self.backend.broadcast(
+                        (self.raw as *const B::Buf, &meta_a),
+                        (&rhs.raw as *const B::Buf, &meta_b),
+                        (&mut result.raw as *mut B::Buf, &result.meta),
+                        ElementwiseBinaryTensorOp::Sub,
+                    ).unwrap();
+                }
+                result
+            }
+        }
+    };
+    // For view types with view RHS
+    ($lhs_type:ident, $rhs_type:ty, view) => {
+        impl<'a, T, B> Sub<$rhs_type> for $lhs_type<'a, T, B>
+        where
+            T: TensorValue,
+            B: Backend<T>,
+        {
+            type Output = TensorBase<T, B>;
+
+            fn sub(self, rhs: $rhs_type) -> Self::Output {
+                let (out_shape, broadcast_stra, broadcast_strb) =
+                    compute_broadcasted_params(&self.meta, &rhs.meta).unwrap();
+                
+                let meta_a = MetaTensor::new(out_shape.clone(), broadcast_stra, self.offset());
+                let meta_b = MetaTensor::new(out_shape.clone(), broadcast_strb, rhs.offset());
+                
+                let mut result = TensorBase::<T, B>::zeros(out_shape);
+
+                unsafe {
+                    self.backend.broadcast(
+                        (self.raw as *const B::Buf, &meta_a),
+                        (rhs.raw as *const B::Buf, &meta_b),
+                        (&mut result.raw as *mut B::Buf, &result.meta),
+                        ElementwiseBinaryTensorOp::Sub,
+                    ).unwrap();
+                }
+                result
+            }
+        }
+    };
+    // For references to owned types with owned RHS
+    (&TensorBase, $rhs_type:ty, owned) => {
+        impl<'a, T, B> Sub<$rhs_type> for &'a TensorBase<T, B>
+        where
+            T: TensorValue,
+            B: Backend<T>,
+        {
+            type Output = TensorBase<T, B>;
+
+            fn sub(self, rhs: $rhs_type) -> Self::Output {
+                let (out_shape, broadcast_stra, broadcast_strb) =
+                    compute_broadcasted_params(&self.meta, &rhs.meta).unwrap();
+                
+                let meta_a = MetaTensor::new(out_shape.clone(), broadcast_stra, self.offset());
+                let meta_b = MetaTensor::new(out_shape.clone(), broadcast_strb, rhs.offset());
+                
+                let mut result = TensorBase::<T, B>::zeros(out_shape);
+
+                unsafe {
+                    self.backend.broadcast(
+                        (&self.raw as *const B::Buf, &meta_a),
+                        (&rhs.raw as *const B::Buf, &meta_b),
+                        (&mut result.raw as *mut B::Buf, &result.meta),
+                        ElementwiseBinaryTensorOp::Sub,
+                    ).unwrap();
+                }
+                result
+            }
+        }
+    };
+    // For references to owned types with view RHS
+    (&TensorBase, $rhs_type:ty, view) => {
+        impl<'a, T, B> Sub<$rhs_type> for &'a TensorBase<T, B>
+        where
+            T: TensorValue,
+            B: Backend<T>,
+        {
+            type Output = TensorBase<T, B>;
+
+            fn sub(self, rhs: $rhs_type) -> Self::Output {
+                let (out_shape, broadcast_stra, broadcast_strb) =
+                    compute_broadcasted_params(&self.meta, &rhs.meta).unwrap();
+                
+                let meta_a = MetaTensor::new(out_shape.clone(), broadcast_stra, self.offset());
+                let meta_b = MetaTensor::new(out_shape.clone(), broadcast_strb, rhs.offset());
+                
+                let mut result = TensorBase::<T, B>::zeros(out_shape);
+
+                unsafe {
+                    self.backend.broadcast(
+                        (&self.raw as *const B::Buf, &meta_a),
+                        (rhs.raw as *const B::Buf, &meta_b),
+                        (&mut result.raw as *mut B::Buf, &result.meta),
+                        ElementwiseBinaryTensorOp::Sub,
+                    ).unwrap();
+                }
+                result
+            }
+        }
+    };
+    // For references to view types with owned RHS
+    (&$lhs_type:ident, $rhs_type:ty, owned) => {
+        impl<'a, 'b, T, B> Sub<$rhs_type> for &'a $lhs_type<'b, T, B>
+        where
+            T: TensorValue,
+            B: Backend<T>,
+        {
+            type Output = TensorBase<T, B>;
+
+            fn sub(self, rhs: $rhs_type) -> Self::Output {
+                let (out_shape, broadcast_stra, broadcast_strb) =
+                    compute_broadcasted_params(&self.meta, &rhs.meta).unwrap();
+                
+                let meta_a = MetaTensor::new(out_shape.clone(), broadcast_stra, self.offset());
+                let meta_b = MetaTensor::new(out_shape.clone(), broadcast_strb, rhs.offset());
+                
+                let mut result = TensorBase::<T, B>::zeros(out_shape);
+
+                unsafe {
+                    self.backend.broadcast(
+                        (self.raw as *const B::Buf, &meta_a),
+                        (&rhs.raw as *const B::Buf, &meta_b),
+                        (&mut result.raw as *mut B::Buf, &result.meta),
+                        ElementwiseBinaryTensorOp::Sub,
+                    ).unwrap();
+                }
+                result
+            }
+        }
+    };
+    // For references to view types with view RHS
+    (&$lhs_type:ident, $rhs_type:ty, view) => {
+        impl<'a, 'b, T, B> Sub<$rhs_type> for &'a $lhs_type<'b, T, B>
+        where
+            T: TensorValue,
+            B: Backend<T>,
+        {
+            type Output = TensorBase<T, B>;
+
+            fn sub(self, rhs: $rhs_type) -> Self::Output {
+                let (out_shape, broadcast_stra, broadcast_strb) =
+                    compute_broadcasted_params(&self.meta, &rhs.meta).unwrap();
+                
+                let meta_a = MetaTensor::new(out_shape.clone(), broadcast_stra, self.offset());
+                let meta_b = MetaTensor::new(out_shape.clone(), broadcast_strb, rhs.offset());
+                
+                let mut result = TensorBase::<T, B>::zeros(out_shape);
+
+                unsafe {
+                    self.backend.broadcast(
+                        (self.raw as *const B::Buf, &meta_a),
+                        (rhs.raw as *const B::Buf, &meta_b),
+                        (&mut result.raw as *mut B::Buf, &result.meta),
+                        ElementwiseBinaryTensorOp::Sub,
+                    ).unwrap();
+                }
+                result
+            }
+        }
+    };
+}
+
+
+// TensorBase -= TensorBase
+impl_sub_assign!(TensorBase, TensorBase<T, B>, owned);
+// TensorBase -= TensorView
+impl_sub_assign!(TensorBase, TensorView<'_, T, B>, view);
+// TensorBase -= TensorViewMut
+impl_sub_assign!(TensorBase, TensorViewMut<'_, T, B>, view);
+// TensorBase -= &TensorBase
+impl_sub_assign!(TensorBase, &TensorBase<T, B>, owned);
+// TensorBase -= &TensorView
+impl_sub_assign!(TensorBase, &TensorView<'_, T, B>, view);
+// TensorBase -= &TensorViewMut
+impl_sub_assign!(TensorBase, &TensorViewMut<'_, T, B>, view);
+
+// TensorViewMut -= TensorBase
+impl_sub_assign!(TensorViewMut, TensorBase<T, B>, owned);
+// TensorViewMut -= TensorView
+impl_sub_assign!(TensorViewMut, TensorView<'_, T, B>, view);
+// TensorViewMut -= TensorViewMut
+impl_sub_assign!(TensorViewMut, TensorViewMut<'_, T, B>, view);
+// TensorViewMut -= &TensorBase
+impl_sub_assign!(TensorViewMut, &TensorBase<T, B>, owned);
+// TensorViewMut -= &TensorView
+impl_sub_assign!(TensorViewMut, &TensorView<'_, T, B>, view);
+// TensorViewMut -= &TensorViewMut
+impl_sub_assign!(TensorViewMut, &TensorViewMut<'_, T, B>, view);
+
+
+// TensorBase - TensorBase
+impl_sub!(TensorBase, TensorBase<T, B>, owned);
+// TensorBase - TensorView
+impl_sub!(TensorBase, TensorView<'_, T, B>, view);
+// TensorBase - TensorViewMut
+impl_sub!(TensorBase, TensorViewMut<'_, T, B>, view);
+// TensorBase - &TensorBase
+impl_sub!(TensorBase, &TensorBase<T, B>, owned);
+// TensorBase - &TensorView
+impl_sub!(TensorBase, &TensorView<'_, T, B>, view);
+// TensorBase - &TensorViewMut
+impl_sub!(TensorBase, &TensorViewMut<'_, T, B>, view);
+
+// &TensorBase - TensorBase
+impl_sub!(&TensorBase, TensorBase<T, B>, owned);
+// &TensorBase - TensorView
+impl_sub!(&TensorBase, TensorView<'_, T, B>, view);
+// &TensorBase - TensorViewMut
+impl_sub!(&TensorBase, TensorViewMut<'_, T, B>, view);
+// &TensorBase - &TensorBase
+impl_sub!(&TensorBase, &TensorBase<T, B>, owned);
+// &TensorBase - &TensorView
+impl_sub!(&TensorBase, &TensorView<'_, T, B>, view);
+// &TensorBase - &TensorViewMut
+impl_sub!(&TensorBase, &TensorViewMut<'_, T, B>, view);
+
+// TensorView - TensorBase
+impl_sub!(TensorView, TensorBase<T, B>, owned);
+// TensorView - TensorView
+impl_sub!(TensorView, TensorView<'_, T, B>, view);
+// TensorView - TensorViewMut
+impl_sub!(TensorView, TensorViewMut<'_, T, B>, view);
+// TensorView - &TensorBase
+impl_sub!(TensorView, &TensorBase<T, B>, owned);
+// TensorView - &TensorView
+impl_sub!(TensorView, &TensorView<'_, T, B>, view);
+// TensorView - &TensorViewMut
+impl_sub!(TensorView, &TensorViewMut<'_, T, B>, view);
+
+// &TensorView - TensorBase
+impl_sub!(&TensorView, TensorBase<T, B>, owned);
+// &TensorView - TensorView
+impl_sub!(&TensorView, TensorView<'_, T, B>, view);
+// &TensorView - TensorViewMut
+impl_sub!(&TensorView, TensorViewMut<'_, T, B>, view);
+// &TensorView - &TensorBase
+impl_sub!(&TensorView, &TensorBase<T, B>, owned);
+// &TensorView - &TensorView
+impl_sub!(&TensorView, &TensorView<'_, T, B>, view);
+// &TensorView - &TensorViewMut
+impl_sub!(&TensorView, &TensorViewMut<'_, T, B>, view);
+
+// TensorViewMut - TensorBase
+impl_sub!(TensorViewMut, TensorBase<T, B>, owned);
+// TensorViewMut - TensorView
+impl_sub!(TensorViewMut, TensorView<'_, T, B>, view);
+// TensorViewMut - TensorViewMut
+impl_sub!(TensorViewMut, TensorViewMut<'_, T, B>, view);
+// TensorViewMut - &TensorBase
+impl_sub!(TensorViewMut, &TensorBase<T, B>, owned);
+// TensorViewMut - &TensorView
+impl_sub!(TensorViewMut, &TensorView<'_, T, B>, view);
+// TensorViewMut - &TensorViewMut
+impl_sub!(TensorViewMut, &TensorViewMut<'_, T, B>, view);
+
+// &TensorViewMut - TensorBase
+impl_sub!(&TensorViewMut, TensorBase<T, B>, owned);
+// &TensorViewMut - TensorView
+impl_sub!(&TensorViewMut, TensorView<'_, T, B>, view);
+// &TensorViewMut - TensorViewMut
+impl_sub!(&TensorViewMut, TensorViewMut<'_, T, B>, view);
+// &TensorViewMut - &TensorBase
+impl_sub!(&TensorViewMut, &TensorBase<T, B>, owned);
+// &TensorViewMut - &TensorView
+impl_sub!(&TensorViewMut, &TensorView<'_, T, B>, view);
+// &TensorViewMut - &TensorViewMut
+impl_sub!(&TensorViewMut, &TensorViewMut<'_, T, B>, view);

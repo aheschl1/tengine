@@ -4,14 +4,16 @@ pub mod binary;
 
 #[cfg(test)]
 mod tests {
-    use crate::{backend::cpu::Cpu, core::{meta::MetaTensorView, primitives::TensorBase, tensor::{AsView, AsViewMut, TensorAccess, TensorAccessMut}, CpuTensor}, ops::binary::PointwiseTensorOp};
+    use std::ops::Add;
+
+    use crate::{backend::cpu::Cpu, core::{meta::MetaTensorView, primitives::TensorBase, tensor::{AsView, AsViewMut, TensorAccess, TensorAccessMut}, CpuTensor}};
 
     
     #[test]
     fn test_add() {
         let mut tensor = TensorBase::<i32, Cpu>::from_buf(vec![1, 2, 3], vec![3]).unwrap();
         let mut view = tensor.view_mut();
-        view += 5;
+        view += &5;
 
         let expected = TensorBase::<i32, Cpu>::from_buf(vec![6, 7, 8], vec![3]).unwrap();
         assert_eq!(tensor.raw.clone(), expected.raw);
@@ -51,7 +53,7 @@ mod tests {
         let mut tensor = TensorBase::<i32, Cpu>::from_buf(vec![10, 20, 30], vec![3]).unwrap();
         let value = 10;
         let mut view = tensor.view_mut();
-        view -= value;
+        view -= &value;
         let expected = TensorBase::<i32, Cpu>::from_buf(vec![0, 10, 20], vec![3]).unwrap();
         assert_eq!(tensor.raw.clone(), expected.raw);
     }
@@ -231,7 +233,7 @@ mod tests {
         assert_eq!(row_slice.get(vec![0]).unwrap(), 5, "Row slice[0] should be 5");
         assert_eq!(row_slice.get(vec![1]).unwrap(), 6, "Row slice[1] should be 6");
         
-        row_slice += &value;
+        row_slice += value;
         
         let expected = TensorBase::<i32, Cpu>::from_buf(vec![1, 2, 3, 4, 1005, 1006, 7, 8], vec![2, 2, 2]).unwrap();
         assert_eq!(tensor.raw.clone(), expected.raw);
@@ -258,7 +260,7 @@ mod tests {
         let mut tensor = TensorBase::<i32, Cpu>::from_buf(vec![1, 2, 3], vec![3]).unwrap();
         let value = 10;
         let view = tensor.view_mut();
-        let result = view + &value;
+        let result = view + value;
         
         assert_eq!(result.raw, vec![11, 12, 13].into_boxed_slice());
         assert_eq!(tensor.raw, vec![1, 2, 3].into_boxed_slice());
@@ -442,7 +444,7 @@ mod tests {
     fn test_add_immutable_view_ref() {
         let tensor = TensorBase::<i32, Cpu>::from_buf(vec![5, 10, 15], vec![3]).unwrap();
         let value = 100;
-        let result = tensor.view() + &value;
+        let result = tensor.view() + value;
         
         assert_eq!(result.raw, vec![105, 110, 115].into_boxed_slice());
         
@@ -1082,7 +1084,7 @@ mod tests {
             vec![3]
         ).unwrap();
         let mut view = tensor.view_mut();
-        view *= 1000.0;
+        view *= &1000.0;
         
         let expected = vec![0.1, 0.2, 0.3];
         for (i, &exp) in expected.iter().enumerate() {
@@ -1142,7 +1144,7 @@ mod tests {
         let vecb = CpuTensor::<f32>::ones((3, 1));
         veca.view_mut().set(vec![0, 0], 22.0).unwrap();
 
-        let vecc = &veca.view().add(&vecb.view()).expect("fail");
+        let vecc = &veca.add(vecb.view());
 
         assert_eq!(vecc.shape().clone(), vec![3, 3]);
         for i in 0..3usize {
@@ -1162,7 +1164,7 @@ mod tests {
         let vecb = CpuTensor::<f32>::ones((3, 1));
         veca.view_mut().set(vec![0, 0], 22.0).unwrap();
 
-        let vecc = &veca.view().add(&vecb.view()).expect("fail");
+        let vecc = &veca.add(vecb.view());
 
         assert_eq!(vecc.shape().clone(), vec![3, 1]);
         for i in 0..3usize {
@@ -1187,7 +1189,7 @@ mod tests {
         let veca = CpuTensor::<f32>::from_buf(vec![5.0], vec![]).unwrap(); // scalar
         let vecb = CpuTensor::<f32>::ones((2, 3, 4));
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast scalar to 3D");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![2, 3, 4]);
         for i in 0..2 {
@@ -1204,7 +1206,7 @@ mod tests {
         let veca = CpuTensor::<f32>::from_buf(vec![1.0, 2.0, 3.0], vec![3]).unwrap(); // (3,)
         let vecb = CpuTensor::<f32>::ones((2, 4, 3)); // (2, 4, 3)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (3,) to (2,4,3)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![2, 4, 3]);
         // Check pattern: last dimension should be [2, 3, 4] everywhere
@@ -1222,7 +1224,7 @@ mod tests {
         let veca = CpuTensor::<f32>::ones((3, 4)); // (3, 4)
         let vecb = CpuTensor::<f32>::ones((2, 3, 4)); // (2, 3, 4)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (3,4) to (2,3,4)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![2, 3, 4]);
         for i in 0..2 {
@@ -1239,7 +1241,7 @@ mod tests {
         let veca = CpuTensor::<f32>::ones((1, 3, 1)); // (1, 3, 1)
         let vecb = CpuTensor::<f32>::ones((2, 3, 4)); // (2, 3, 4)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (1,3,1) to (2,3,4)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![2, 3, 4]);
         for i in 0..2 {
@@ -1256,7 +1258,7 @@ mod tests {
         let veca = CpuTensor::<f32>::ones((3, 4)); // (3, 4)
         let vecb = CpuTensor::<f32>::ones((5, 3, 4)); // (5, 3, 4)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (3,4) to (5,3,4)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![5, 3, 4]);
         for i in 0..5 {
@@ -1275,7 +1277,7 @@ mod tests {
         let veca = CpuTensor::<f32>::from_buf(vec![10.0, 20.0], vec![2]).unwrap(); // (2,)
         let vecb = CpuTensor::<f32>::ones((3, 4, 5, 2)); // (3, 4, 5, 2)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (2,) to (3,4,5,2)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![3, 4, 5, 2]);
         // Check pattern in last dimension
@@ -1294,7 +1296,7 @@ mod tests {
         let veca = CpuTensor::<f32>::ones((1, 1, 5, 1)); // (1, 1, 5, 1)
         let vecb = CpuTensor::<f32>::ones((2, 3, 5, 4)); // (2, 3, 5, 4)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (1,1,5,1) to (2,3,5,4)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![2, 3, 5, 4]);
         for i in 0..2 {
@@ -1313,7 +1315,7 @@ mod tests {
         let veca = CpuTensor::<f32>::ones((3, 5, 4)); // (3, 5, 4)
         let vecb = CpuTensor::<f32>::ones((2, 3, 5, 4)); // (2, 3, 5, 4)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (3,5,4) to (2,3,5,4)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![2, 3, 5, 4]);
         for i in 0..2 {
@@ -1334,7 +1336,7 @@ mod tests {
         let veca = CpuTensor::<f32>::from_buf(vec![100.0], vec![]).unwrap(); // scalar
         let vecb = CpuTensor::<f32>::ones((2, 2, 2, 2, 2)); // (2, 2, 2, 2, 2)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast scalar to 5D");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![2, 2, 2, 2, 2]);
         for i in 0..2 {
@@ -1355,7 +1357,7 @@ mod tests {
         let veca = CpuTensor::<f32>::ones((1, 2, 1, 3, 1)); // (1, 2, 1, 3, 1)
         let vecb = CpuTensor::<f32>::ones((4, 2, 5, 3, 6)); // (4, 2, 5, 3, 6)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (1,2,1,3,1) to (4,2,5,3,6)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![4, 2, 5, 3, 6]);
         // Check a few representative values
@@ -1370,7 +1372,7 @@ mod tests {
         let veca = CpuTensor::<f32>::ones((3, 4)); // (3, 4)
         let vecb = CpuTensor::<f32>::ones((2, 5, 3, 4)); // (2, 5, 3, 4)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (3,4) to (2,5,3,4)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![2, 5, 3, 4]);
         for i in 0..2 {
@@ -1389,7 +1391,7 @@ mod tests {
         let veca = CpuTensor::<f32>::from_buf(vec![1.0, 2.0, 3.0], vec![3]).unwrap(); // (3,)
         let vecb = CpuTensor::<f32>::ones((2, 4, 5, 6, 3)); // (2, 4, 5, 6, 3)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (3,) to (2,4,5,6,3)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![2, 4, 5, 6, 3]);
         // Check pattern in last dimension
@@ -1415,7 +1417,7 @@ mod tests {
         let vecb = CpuTensor::<f32>::ones((2, 5, 6)); // (2, 5, 6) - incompatible!
         
         // This should panic because 4 != 6 and 3 != 5
-        let _vecc = veca.view().add(&vecb.view()).expect("Should fail - incompatible dims");
+        let _vecc = veca.add(vecb.view());
     }
 
     #[test]
@@ -1425,7 +1427,7 @@ mod tests {
         let vecb = CpuTensor::<f32>::ones((2, 3, 7)); // (2, 3, 7)
         
         // Should fail because 5 != 7
-        let _vecc = veca.view().add(&vecb.view()).expect("Should fail - 5 != 7");
+        let _vecc = veca.add(vecb.view());
     }
 
     #[test]
@@ -1435,7 +1437,7 @@ mod tests {
         let vecb = CpuTensor::<f32>::ones((2, 5, 4)); // (2, 5, 4)
         
         // Should fail because middle dimension 3 != 5 and neither is 1
-        let _vecc = veca.view().add(&vecb.view()).expect("Should fail - 3 != 5");
+        let _vecc = veca.add(vecb.view());
     }
 
     #[test]
@@ -1445,7 +1447,7 @@ mod tests {
         let vecb = CpuTensor::<f32>::ones((2, 7, 4, 5)); // (2, 7, 4, 5)
         
         // Should fail because 3 != 7
-        let _vecc = veca.view().add(&vecb.view()).expect("Should fail - 3 != 7");
+        let _vecc = veca.add(vecb.view());
     }
 
     #[test]
@@ -1455,7 +1457,7 @@ mod tests {
         let vecb = CpuTensor::<f32>::ones((6, 2, 7, 4, 5)); // (6, 2, 7, 4, 5)
         
         // Should fail because 3 != 7 (dim 2)
-        let _vecc = veca.view().add(&vecb.view()).expect("Should fail - 3 != 7");
+        let _vecc = veca.add(vecb.view());
     }
 
     #[test]
@@ -1465,7 +1467,7 @@ mod tests {
         let vecb = CpuTensor::<f32>::ones((4, 3, 6)); // (4, 3, 6)
         
         // Should fail because 5 != 3 and neither is 1
-        let _vecc = veca.view().add(&vecb.view()).expect("Should fail - 5 != 3");
+        let _vecc = veca.add(vecb.view());
     }
 
     // --- Edge Case Broadcasts ---
@@ -1475,7 +1477,7 @@ mod tests {
         let veca = CpuTensor::<f32>::ones((1, 1, 1)); // (1, 1, 1)
         let vecb = CpuTensor::<f32>::ones((5, 6, 7)); // (5, 6, 7)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (1,1,1) to (5,6,7)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![5, 6, 7]);
         assert_eq!(vecc.view().get(vec![0, 0, 0]).unwrap(), 2.0);
@@ -1487,7 +1489,7 @@ mod tests {
         let veca = CpuTensor::<f32>::ones((3, 4, 5)); // (3, 4, 5)
         let vecb = CpuTensor::<f32>::ones((3, 4, 5)); // (3, 4, 5)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should work - identical shapes");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![3, 4, 5]);
         for i in 0..3 {
@@ -1504,7 +1506,7 @@ mod tests {
         let veca = CpuTensor::<f32>::ones((1, 4, 1, 6)); // (1, 4, 1, 6)
         let vecb = CpuTensor::<f32>::ones((3, 1, 5, 1)); // (3, 1, 5, 1)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast to (3,4,5,6)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![3, 4, 5, 6]);
         assert_eq!(vecc.view().get(vec![0, 0, 0, 0]).unwrap(), 2.0);
@@ -1516,7 +1518,7 @@ mod tests {
         let veca = CpuTensor::<f32>::ones((3, 4, 1)); // (3, 4, 1)
         let vecb = CpuTensor::<f32>::ones((3, 4, 5)); // (3, 4, 5)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (3,4,1) to (3,4,5)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![3, 4, 5]);
         for i in 0..3 {
@@ -1533,7 +1535,7 @@ mod tests {
         let veca = CpuTensor::<f32>::ones((1, 4, 5)); // (1, 4, 5)
         let vecb = CpuTensor::<f32>::ones((3, 4, 5)); // (3, 4, 5)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (1,4,5) to (3,4,5)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![3, 4, 5]);
         for i in 0..3 {
@@ -1552,7 +1554,7 @@ mod tests {
         let veca = CpuTensor::<f32>::ones((4, 5)); // (4, 5)
         let vecb = CpuTensor::<f32>::ones((3, 4, 5)); // (3, 4, 5)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast");
+        let vecc = veca.add(vecb.view());
         
         // Expected output shape: (3, 4, 5)
         assert_eq!(*vecc.shape(), vec![3, 4, 5]);
@@ -1563,7 +1565,7 @@ mod tests {
         let veca = CpuTensor::<f32>::ones((7,)); // (7,)
         let vecb = CpuTensor::<f32>::ones((2, 3, 4, 7)); // (2, 3, 4, 7)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast");
+        let vecc = veca.add(vecb.view());
         
         // Expected output shape: (2, 3, 4, 7)
         assert_eq!(*vecc.shape(), vec![2, 3, 4, 7]);
@@ -1574,7 +1576,7 @@ mod tests {
         let veca = CpuTensor::<f32>::ones((1, 5, 1)); // (1, 5, 1)
         let vecb = CpuTensor::<f32>::ones((4, 5, 6)); // (4, 5, 6)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast");
+        let vecc = veca.add(vecb.view());
         
         // Expected output shape: (4, 5, 6)
         assert_eq!(*vecc.shape(), vec![4, 5, 6]);
@@ -1585,7 +1587,7 @@ mod tests {
         let veca = CpuTensor::<f32>::ones((5, 6)); // (5, 6)
         let vecb = CpuTensor::<f32>::ones((2, 3, 4, 5, 6)); // (2, 3, 4, 5, 6)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast");
+        let vecc = veca.add(vecb.view());
         
         // Expected output shape: (2, 3, 4, 5, 6)
         assert_eq!(*vecc.shape(), vec![2, 3, 4, 5, 6]);
@@ -1596,7 +1598,7 @@ mod tests {
         let veca = CpuTensor::<f32>::ones((1, 4, 1, 6)); // (1, 4, 1, 6)
         let vecb = CpuTensor::<f32>::ones((3, 1, 5, 6)); // (3, 1, 5, 6)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast");
+        let vecc = veca.add(vecb.view());
         
         // Expected output shape: (3, 4, 5, 6)
         assert_eq!(*vecc.shape(), vec![3, 4, 5, 6]);
@@ -1607,7 +1609,7 @@ mod tests {
         let veca = CpuTensor::<f32>::from_buf(vec![42.0], vec![]).unwrap(); // scalar
         let vecb = CpuTensor::<f32>::ones((2, 3, 4, 5, 6)); // (2, 3, 4, 5, 6)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast");
+        let vecc = veca.add(vecb.view());
         
         // Expected output shape: (2, 3, 4, 5, 6)
         assert_eq!(*vecc.shape(), vec![2, 3, 4, 5, 6]);
@@ -1618,7 +1620,7 @@ mod tests {
         let veca = CpuTensor::<f32>::ones((1, 1, 3, 1, 5)); // (1, 1, 3, 1, 5)
         let vecb = CpuTensor::<f32>::ones((2, 4, 3, 6, 5)); // (2, 4, 3, 6, 5)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast");
+        let vecc = veca.add(vecb.view());
         
         // Expected output shape: (2, 4, 3, 6, 5)
         assert_eq!(*vecc.shape(), vec![2, 4, 3, 6, 5]);
@@ -1636,7 +1638,7 @@ mod tests {
         veca.view_mut().set(vec![0, 0], 5.0).unwrap();
         veca.view_mut().set(vec![0, 1], 6.0).unwrap();
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (1,4) and (3,1) to (3,4)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(*vecc.shape(), vec![3, 4]);
         // First column should be 5+1=6, second column 6+1=7, rest 1+1=2
@@ -1656,7 +1658,7 @@ mod tests {
         veca.view_mut().set(vec![0, 0], 10.0).unwrap();
         veca.view_mut().set(vec![1, 0], 20.0).unwrap();
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (4,1) and (1,5) to (4,5)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(*vecc.shape(), vec![4, 5]);
         // First row should all be 10+1=11, second row 20+1=21, rest 1+1=2
@@ -1674,7 +1676,7 @@ mod tests {
         let veca = CpuTensor::<f32>::ones((1, 3, 1)); // (1, 3, 1)
         let vecb = CpuTensor::<f32>::ones((2, 1, 4)); // (2, 1, 4)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast to (2,3,4)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(*vecc.shape(), vec![2, 3, 4]);
         for i in 0..2 {
@@ -1694,7 +1696,7 @@ mod tests {
         veca.view_mut().set(vec![0, 0, 0], 100.0).unwrap();
         vecb.view_mut().set(vec![0, 0, 0], 200.0).unwrap();
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast to (3,4,5)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(*vecc.shape(), vec![3, 4, 5]);
         // [0,0,0] should be 100+200=300
@@ -1714,7 +1716,7 @@ mod tests {
         let veca = CpuTensor::<f32>::ones((5, 1, 3)); // (5, 1, 3)
         let vecb = CpuTensor::<f32>::ones((1, 4, 3)); // (1, 4, 3)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast to (5,4,3)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(*vecc.shape(), vec![5, 4, 3]);
         // All values should be 2.0
@@ -1733,7 +1735,7 @@ mod tests {
         let veca = CpuTensor::<f32>::ones((1, 3, 1, 5)); // (1, 3, 1, 5)
         let vecb = CpuTensor::<f32>::ones((2, 1, 4, 1)); // (2, 1, 4, 1)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast to (2,3,4,5)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(*vecc.shape(), vec![2, 3, 4, 5]);
         // Spot check some values
@@ -1747,7 +1749,7 @@ mod tests {
         let veca = CpuTensor::<f32>::ones((1, 1, 6, 7)); // (1, 1, 6, 7)
         let vecb = CpuTensor::<f32>::ones((5, 4, 1, 1)); // (5, 4, 1, 1)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast to (5,4,6,7)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(*vecc.shape(), vec![5, 4, 6, 7]);
         // Check boundaries
@@ -1761,7 +1763,7 @@ mod tests {
         let veca = CpuTensor::<f32>::ones((1, 2, 1, 3, 1)); // (1, 2, 1, 3, 1)
         let vecb = CpuTensor::<f32>::ones((4, 1, 5, 1, 6)); // (4, 1, 5, 1, 6)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast to (4,2,5,3,6)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(*vecc.shape(), vec![4, 2, 5, 3, 6]);
         // Spot check
@@ -1775,7 +1777,7 @@ mod tests {
         let veca = CpuTensor::<f32>::ones((1, 3, 1, 1, 7)); // (1, 3, 1, 1, 7)
         let vecb = CpuTensor::<f32>::ones((2, 1, 4, 5, 1)); // (2, 1, 4, 5, 1)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast to (2,3,4,5,7)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(*vecc.shape(), vec![2, 3, 4, 5, 7]);
         // Verify a few positions
@@ -1791,7 +1793,7 @@ mod tests {
         let veca = CpuTensor::<f32>::ones((1, 5)); // (1, 5)
         let vecb = CpuTensor::<f32>::ones((3, 1, 1)); // (3, 1, 1)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(*vecc.shape(), vec![3, 1, 5]);
         for i in 0..3 {
@@ -1811,7 +1813,7 @@ mod tests {
         let vecb = CpuTensor::<f32>::ones((5, 1)); // (5, 1)
         
         // Should fail: 3 != 5 and 4 != 1
-        let _vecc = veca.view().add(&vecb.view()).expect("Should fail - 3 != 5");
+        let _vecc = veca.add(vecb.view());
     }
 
     #[test]
@@ -1822,7 +1824,7 @@ mod tests {
         let vecb = CpuTensor::<f32>::ones((1, 3, 5)); // (1, 3, 5)
         
         // Should fail: 4 != 5
-        let _vecc = veca.view().add(&vecb.view()).expect("Should fail - 4 != 5");
+        let _vecc = veca.add(vecb.view());
     }
 
     #[test]
@@ -1833,7 +1835,7 @@ mod tests {
         let vecb = CpuTensor::<f32>::ones((2, 1, 4, 7)); // (2, 1, 4, 7)
         
         // Should fail: 6 != 7
-        let _vecc = veca.view().add(&vecb.view()).expect("Should fail - 6 != 7");
+        let _vecc = veca.add(vecb.view());
     }
 
     #[test]
@@ -1845,14 +1847,521 @@ mod tests {
         let vecb = CpuTensor::<f32>::ones((3, 1, 5)); // (3, 1, 5)
         
         // Should fail: 2 != 3
-        let _vecc = veca.view().add(&vecb.view()).expect("Should fail - 2 != 3");
+        let _vecc = veca.add(vecb.view());
+    }
+
+    #[test]
+    fn test_add_assign_broadcast() {
+        let mut tensor = CpuTensor::<i32>::zeros((3, 3));
+        let tensor2 = CpuTensor::<i32>::ones((3,));
+        tensor += tensor2.view();
+        let expected = CpuTensor::<i32>::ones((3, 3));
+        assert_eq!(tensor, expected);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_add_assign_broadcast_incompatible() {
+        let mut tensor = CpuTensor::<i32>::zeros((1, 3));
+        let tensor2 = CpuTensor::<i32>::ones((4, 3));
+        tensor += tensor2.view(); // Should panic
+    }
+
+    // ============================================================================
+    // SUBTRACTION TESTS - Broadcasting & Type Combinations
+    // ============================================================================
+
+    #[test]
+    fn test_sub_broadcast_basic() {
+        let mut veca = CpuTensor::<f32>::ones((3, 3));
+        veca.view_mut().set(vec![0, 0], 5.0).unwrap();
+        let vecb = CpuTensor::<f32>::ones((3, 1));
+        
+        let vecc = veca - vecb.view();
+        
+        assert_eq!(vecc.shape().clone(), vec![3, 3]);
+        assert_eq!(vecc.view().get(vec![0, 0]).unwrap(), 4.0); // 5 - 1
+        for i in 1..3 {
+            for j in 0..3 {
+                assert_eq!(vecc.view().get(vec![i, j]).unwrap(), 0.0); // 1 - 1
+            }
+        }
+    }
+
+    #[test]
+    fn test_sub_3d_broadcast() {
+        let veca = CpuTensor::<f32>::from_buf(vec![10.0, 20.0, 30.0], vec![3]).unwrap();
+        let vecb = CpuTensor::<f32>::ones((2, 4, 3));
+        
+        let vecc = veca - vecb.view();
+        
+        assert_eq!(vecc.shape().clone(), vec![2, 4, 3]);
+        for i in 0..2 {
+            for j in 0..4 {
+                assert_eq!(vecc.view().get(vec![i, j, 0]).unwrap(), 9.0);
+                assert_eq!(vecc.view().get(vec![i, j, 1]).unwrap(), 19.0);
+                assert_eq!(vecc.view().get(vec![i, j, 2]).unwrap(), 29.0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_sub_assign_broadcast() {
+        let mut tensor = CpuTensor::<i32>::from_buf(vec![5, 10, 15], vec![3]).unwrap();
+        let tensor2 = CpuTensor::<i32>::ones((3,));
+        tensor -= tensor2.view();
+        let expected = CpuTensor::<i32>::from_buf(vec![4, 9, 14], vec![3]).unwrap();
+        assert_eq!(tensor, expected);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_sub_assign_broadcast_incompatible() {
+        let mut tensor = CpuTensor::<i32>::zeros((1, 3));
+        let tensor2 = CpuTensor::<i32>::ones((4, 3));
+        tensor -= tensor2.view();
+    }
+
+    // ============================================================================
+    // MULTIPLICATION TESTS - Broadcasting & Type Combinations
+    // ============================================================================
+
+    #[test]
+    fn test_mul_broadcast_basic() {
+        let mut veca = CpuTensor::<f32>::ones((3, 3));
+        veca.view_mut().set(vec![0, 0], 5.0).unwrap();
+        let mut vecb = CpuTensor::<f32>::ones((3, 1));
+        vecb.view_mut().set(vec![1, 0], 2.0).unwrap();
+        
+        let vecc = veca * vecb.view();
+        
+        assert_eq!(vecc.shape().clone(), vec![3, 3]);
+        assert_eq!(vecc.view().get(vec![0, 0]).unwrap(), 5.0); // 5 * 1
+        assert_eq!(vecc.view().get(vec![1, 0]).unwrap(), 2.0); // 1 * 2
+        assert_eq!(vecc.view().get(vec![2, 2]).unwrap(), 1.0); // 1 * 1
+    }
+
+    #[test]
+    fn test_mul_3d_broadcast() {
+        let veca = CpuTensor::<f32>::from_buf(vec![2.0, 3.0, 4.0], vec![3]).unwrap();
+        let vecb = CpuTensor::<f32>::ones((2, 4, 3));
+        
+        let vecc = veca * vecb.view();
+        
+        assert_eq!(vecc.shape().clone(), vec![2, 4, 3]);
+        for i in 0..2 {
+            for j in 0..4 {
+                assert_eq!(vecc.view().get(vec![i, j, 0]).unwrap(), 2.0);
+                assert_eq!(vecc.view().get(vec![i, j, 1]).unwrap(), 3.0);
+                assert_eq!(vecc.view().get(vec![i, j, 2]).unwrap(), 4.0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_mul_scalar_broadcast() {
+        let veca = CpuTensor::<f32>::from_buf(vec![5.0], vec![]).unwrap();
+        let vecb = CpuTensor::<f32>::from_buf(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2]).unwrap();
+        
+        let vecc = veca * vecb.view();
+        
+        assert_eq!(vecc.shape().clone(), vec![2, 2]);
+        assert_eq!(vecc.view().get(vec![0, 0]).unwrap(), 5.0);
+        assert_eq!(vecc.view().get(vec![0, 1]).unwrap(), 10.0);
+        assert_eq!(vecc.view().get(vec![1, 0]).unwrap(), 15.0);
+        assert_eq!(vecc.view().get(vec![1, 1]).unwrap(), 20.0);
+    }
+
+    #[test]
+    fn test_mul_assign_broadcast() {
+        let mut tensor = CpuTensor::<i32>::from_buf(vec![2, 4, 6], vec![3]).unwrap();
+        let tensor2 = CpuTensor::<i32>::from_buf(vec![3, 3, 3], vec![3]).unwrap();
+        tensor *= tensor2.view();
+        let expected = CpuTensor::<i32>::from_buf(vec![6, 12, 18], vec![3]).unwrap();
+        assert_eq!(tensor, expected);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_mul_assign_broadcast_incompatible() {
+        let mut tensor = CpuTensor::<i32>::zeros((1, 3));
+        let tensor2 = CpuTensor::<i32>::ones((4, 3));
+        tensor *= tensor2.view();
+    }
+
+    // ============================================================================
+    // TYPE COMBINATION TESTS - Add, Sub, Mul with different LHS/RHS types
+    // ============================================================================
+
+    // --- TensorBase op TensorBase ---
+    #[test]
+    fn test_tensorbase_add_tensorbase() {
+        let a = CpuTensor::<f32>::ones((2, 3));
+        let b = CpuTensor::<f32>::ones((2, 3));
+        let c = a + b;
+        assert_eq!(*c.shape(), vec![2, 3]);
+        assert_eq!(c.view().get(vec![0, 0]).unwrap(), 2.0);
+    }
+
+    #[test]
+    fn test_tensorbase_sub_tensorbase() {
+        let a = CpuTensor::<f32>::from_buf(vec![5.0, 3.0], vec![2]).unwrap();
+        let b = CpuTensor::<f32>::ones((2,));
+        let c = a - b;
+        assert_eq!(c.view().get(vec![0]).unwrap(), 4.0);
+        assert_eq!(c.view().get(vec![1]).unwrap(), 2.0);
+    }
+
+    #[test]
+    fn test_tensorbase_mul_tensorbase() {
+        let a = CpuTensor::<f32>::from_buf(vec![2.0, 3.0], vec![2]).unwrap();
+        let b = CpuTensor::<f32>::from_buf(vec![4.0, 5.0], vec![2]).unwrap();
+        let c = a * b;
+        assert_eq!(c.view().get(vec![0]).unwrap(), 8.0);
+        assert_eq!(c.view().get(vec![1]).unwrap(), 15.0);
+    }
+
+    // --- TensorBase op TensorView ---
+    #[test]
+    fn test_tensorbase_add_tensorview() {
+        let a = CpuTensor::<f32>::ones((2, 3));
+        let b = CpuTensor::<f32>::ones((2, 3));
+        let c = a + b.view();
+        assert_eq!(c.view().get(vec![0, 0]).unwrap(), 2.0);
+    }
+
+    #[test]
+    fn test_tensorbase_sub_tensorview() {
+        let a = CpuTensor::<f32>::from_buf(vec![10.0, 20.0], vec![2]).unwrap();
+        let b = CpuTensor::<f32>::from_buf(vec![3.0, 7.0], vec![2]).unwrap();
+        let c = a - b.view();
+        assert_eq!(c.view().get(vec![0]).unwrap(), 7.0);
+        assert_eq!(c.view().get(vec![1]).unwrap(), 13.0);
+    }
+
+    #[test]
+    fn test_tensorbase_mul_tensorview() {
+        let a = CpuTensor::<f32>::from_buf(vec![6.0, 7.0], vec![2]).unwrap();
+        let b = CpuTensor::<f32>::from_buf(vec![2.0, 3.0], vec![2]).unwrap();
+        let c = a * b.view();
+        assert_eq!(c.view().get(vec![0]).unwrap(), 12.0);
+        assert_eq!(c.view().get(vec![1]).unwrap(), 21.0);
+    }
+
+    // --- TensorBase op TensorViewMut ---
+    #[test]
+    fn test_tensorbase_add_tensorviewmut() {
+        let a = CpuTensor::<f32>::ones((2, 3));
+        let mut b = CpuTensor::<f32>::ones((2, 3));
+        let c = a + b.view_mut();
+        assert_eq!(c.view().get(vec![1, 2]).unwrap(), 2.0);
+    }
+
+    #[test]
+    fn test_tensorbase_sub_tensorviewmut() {
+        let a = CpuTensor::<f32>::from_buf(vec![8.0, 9.0], vec![2]).unwrap();
+        let mut b = CpuTensor::<f32>::from_buf(vec![3.0, 4.0], vec![2]).unwrap();
+        let c = a - b.view_mut();
+        assert_eq!(c.view().get(vec![0]).unwrap(), 5.0);
+        assert_eq!(c.view().get(vec![1]).unwrap(), 5.0);
+    }
+
+    #[test]
+    fn test_tensorbase_mul_tensorviewmut() {
+        let a = CpuTensor::<f32>::from_buf(vec![5.0, 6.0], vec![2]).unwrap();
+        let mut b = CpuTensor::<f32>::from_buf(vec![2.0, 2.0], vec![2]).unwrap();
+        let c = a * b.view_mut();
+        assert_eq!(c.view().get(vec![0]).unwrap(), 10.0);
+        assert_eq!(c.view().get(vec![1]).unwrap(), 12.0);
+    }
+
+    // --- TensorBase op &TensorBase ---
+    #[test]
+    fn test_tensorbase_add_ref_tensorbase() {
+        let a = CpuTensor::<f32>::ones((2, 3));
+        let b = CpuTensor::<f32>::ones((2, 3));
+        let c = a + &b;
+        assert_eq!(c.view().get(vec![0, 0]).unwrap(), 2.0);
+    }
+
+    #[test]
+    fn test_tensorbase_sub_ref_tensorbase() {
+        let a = CpuTensor::<f32>::from_buf(vec![15.0, 25.0], vec![2]).unwrap();
+        let b = CpuTensor::<f32>::from_buf(vec![5.0, 10.0], vec![2]).unwrap();
+        let c = a - &b;
+        assert_eq!(c.view().get(vec![0]).unwrap(), 10.0);
+        assert_eq!(c.view().get(vec![1]).unwrap(), 15.0);
+    }
+
+    #[test]
+    fn test_tensorbase_mul_ref_tensorbase() {
+        let a = CpuTensor::<f32>::from_buf(vec![3.0, 4.0], vec![2]).unwrap();
+        let b = CpuTensor::<f32>::from_buf(vec![5.0, 6.0], vec![2]).unwrap();
+        let c = a * &b;
+        assert_eq!(c.view().get(vec![0]).unwrap(), 15.0);
+        assert_eq!(c.view().get(vec![1]).unwrap(), 24.0);
+    }
+
+    // --- &TensorBase op TensorBase ---
+    #[test]
+    fn test_ref_tensorbase_add_tensorbase() {
+        let a = CpuTensor::<f32>::ones((2, 3));
+        let b = CpuTensor::<f32>::ones((2, 3));
+        let c = &a + b;
+        assert_eq!(c.view().get(vec![0, 0]).unwrap(), 2.0);
+    }
+
+    #[test]
+    fn test_ref_tensorbase_sub_tensorbase() {
+        let a = CpuTensor::<f32>::from_buf(vec![20.0, 30.0], vec![2]).unwrap();
+        let b = CpuTensor::<f32>::from_buf(vec![8.0, 12.0], vec![2]).unwrap();
+        let c = &a - b;
+        assert_eq!(c.view().get(vec![0]).unwrap(), 12.0);
+        assert_eq!(c.view().get(vec![1]).unwrap(), 18.0);
+    }
+
+    #[test]
+    fn test_ref_tensorbase_mul_tensorbase() {
+        let a = CpuTensor::<f32>::from_buf(vec![7.0, 8.0], vec![2]).unwrap();
+        let b = CpuTensor::<f32>::from_buf(vec![2.0, 3.0], vec![2]).unwrap();
+        let c = &a * b;
+        assert_eq!(c.view().get(vec![0]).unwrap(), 14.0);
+        assert_eq!(c.view().get(vec![1]).unwrap(), 24.0);
+    }
+
+    // --- &TensorBase op &TensorBase ---
+    #[test]
+    fn test_ref_tensorbase_add_ref_tensorbase() {
+        let a = CpuTensor::<f32>::ones((2, 3));
+        let b = CpuTensor::<f32>::ones((2, 3));
+        let c = &a + &b;
+        assert_eq!(c.view().get(vec![0, 0]).unwrap(), 2.0);
+    }
+
+    #[test]
+    fn test_ref_tensorbase_sub_ref_tensorbase() {
+        let a = CpuTensor::<f32>::from_buf(vec![100.0, 200.0], vec![2]).unwrap();
+        let b = CpuTensor::<f32>::from_buf(vec![30.0, 70.0], vec![2]).unwrap();
+        let c = &a - &b;
+        assert_eq!(c.view().get(vec![0]).unwrap(), 70.0);
+        assert_eq!(c.view().get(vec![1]).unwrap(), 130.0);
+    }
+
+    #[test]
+    fn test_ref_tensorbase_mul_ref_tensorbase() {
+        let a = CpuTensor::<f32>::from_buf(vec![9.0, 10.0], vec![2]).unwrap();
+        let b = CpuTensor::<f32>::from_buf(vec![2.0, 4.0], vec![2]).unwrap();
+        let c = &a * &b;
+        assert_eq!(c.view().get(vec![0]).unwrap(), 18.0);
+        assert_eq!(c.view().get(vec![1]).unwrap(), 40.0);
+    }
+
+    // --- TensorView op TensorBase ---
+    #[test]
+    fn test_tensorview_add_tensorbase() {
+        let a = CpuTensor::<f32>::ones((2, 3));
+        let b = CpuTensor::<f32>::ones((2, 3));
+        let c = a.view() + b;
+        assert_eq!(c.view().get(vec![0, 0]).unwrap(), 2.0);
+    }
+
+    #[test]
+    fn test_tensorview_sub_tensorbase() {
+        let a = CpuTensor::<f32>::from_buf(vec![50.0, 60.0], vec![2]).unwrap();
+        let b = CpuTensor::<f32>::from_buf(vec![20.0, 25.0], vec![2]).unwrap();
+        let c = a.view() - b;
+        assert_eq!(c.view().get(vec![0]).unwrap(), 30.0);
+        assert_eq!(c.view().get(vec![1]).unwrap(), 35.0);
+    }
+
+    #[test]
+    fn test_tensorview_mul_tensorbase() {
+        let a = CpuTensor::<f32>::from_buf(vec![11.0, 12.0], vec![2]).unwrap();
+        let b = CpuTensor::<f32>::from_buf(vec![3.0, 4.0], vec![2]).unwrap();
+        let c = a.view() * b;
+        assert_eq!(c.view().get(vec![0]).unwrap(), 33.0);
+        assert_eq!(c.view().get(vec![1]).unwrap(), 48.0);
+    }
+
+    // --- TensorView op TensorView ---
+    #[test]
+    fn test_tensorview_add_tensorview() {
+        let a = CpuTensor::<f32>::ones((2, 3));
+        let b = CpuTensor::<f32>::ones((2, 3));
+        let c = a.view() + b.view();
+        assert_eq!(c.view().get(vec![0, 0]).unwrap(), 2.0);
+    }
+
+    #[test]
+    fn test_tensorview_sub_tensorview() {
+        let a = CpuTensor::<f32>::from_buf(vec![70.0, 80.0], vec![2]).unwrap();
+        let b = CpuTensor::<f32>::from_buf(vec![30.0, 35.0], vec![2]).unwrap();
+        let c = a.view() - b.view();
+        assert_eq!(c.view().get(vec![0]).unwrap(), 40.0);
+        assert_eq!(c.view().get(vec![1]).unwrap(), 45.0);
+    }
+
+    #[test]
+    fn test_tensorview_mul_tensorview() {
+        let a = CpuTensor::<f32>::from_buf(vec![13.0, 14.0], vec![2]).unwrap();
+        let b = CpuTensor::<f32>::from_buf(vec![2.0, 5.0], vec![2]).unwrap();
+        let c = a.view() * b.view();
+        assert_eq!(c.view().get(vec![0]).unwrap(), 26.0);
+        assert_eq!(c.view().get(vec![1]).unwrap(), 70.0);
+    }
+
+    // --- TensorViewMut op TensorBase ---
+    #[test]
+    fn test_tensorviewmut_add_tensorbase() {
+        let mut a = CpuTensor::<f32>::ones((2, 3));
+        let b = CpuTensor::<f32>::ones((2, 3));
+        let c = a.view_mut() + b;
+        assert_eq!(c.view().get(vec![0, 0]).unwrap(), 2.0);
+    }
+
+    #[test]
+    fn test_tensorviewmut_sub_tensorbase() {
+        let mut a = CpuTensor::<f32>::from_buf(vec![90.0, 100.0], vec![2]).unwrap();
+        let b = CpuTensor::<f32>::from_buf(vec![40.0, 45.0], vec![2]).unwrap();
+        let c = a.view_mut() - b;
+        assert_eq!(c.view().get(vec![0]).unwrap(), 50.0);
+        assert_eq!(c.view().get(vec![1]).unwrap(), 55.0);
+    }
+
+    #[test]
+    fn test_tensorviewmut_mul_tensorbase() {
+        let mut a = CpuTensor::<f32>::from_buf(vec![15.0, 16.0], vec![2]).unwrap();
+        let b = CpuTensor::<f32>::from_buf(vec![2.0, 3.0], vec![2]).unwrap();
+        let c = a.view_mut() * b;
+        assert_eq!(c.view().get(vec![0]).unwrap(), 30.0);
+        assert_eq!(c.view().get(vec![1]).unwrap(), 48.0);
+    }
+
+    // --- TensorViewMut op TensorViewMut ---
+    #[test]
+    fn test_tensorviewmut_add_tensorviewmut() {
+        let mut a = CpuTensor::<f32>::ones((2, 3));
+        let mut b = CpuTensor::<f32>::ones((2, 3));
+        let c = a.view_mut() + b.view_mut();
+        assert_eq!(c.view().get(vec![0, 0]).unwrap(), 2.0);
+    }
+
+    #[test]
+    fn test_tensorviewmut_sub_tensorviewmut() {
+        let mut a = CpuTensor::<f32>::from_buf(vec![110.0, 120.0], vec![2]).unwrap();
+        let mut b = CpuTensor::<f32>::from_buf(vec![50.0, 60.0], vec![2]).unwrap();
+        let c = a.view_mut() - b.view_mut();
+        assert_eq!(c.view().get(vec![0]).unwrap(), 60.0);
+        assert_eq!(c.view().get(vec![1]).unwrap(), 60.0);
+    }
+
+    #[test]
+    fn test_tensorviewmut_mul_tensorviewmut() {
+        let mut a = CpuTensor::<f32>::from_buf(vec![17.0, 18.0], vec![2]).unwrap();
+        let mut b = CpuTensor::<f32>::from_buf(vec![3.0, 4.0], vec![2]).unwrap();
+        let c = a.view_mut() * b.view_mut();
+        assert_eq!(c.view().get(vec![0]).unwrap(), 51.0);
+        assert_eq!(c.view().get(vec![1]).unwrap(), 72.0);
+    }
+
+    // --- &TensorView op &TensorView ---
+    #[test]
+    fn test_ref_tensorview_add_ref_tensorview() {
+        let a = CpuTensor::<f32>::ones((2, 3));
+        let b = CpuTensor::<f32>::ones((2, 3));
+        let c = &a.view() + &b.view();
+        assert_eq!(c.view().get(vec![0, 0]).unwrap(), 2.0);
+    }
+
+    #[test]
+    fn test_ref_tensorview_sub_ref_tensorview() {
+        let a = CpuTensor::<f32>::from_buf(vec![150.0, 200.0], vec![2]).unwrap();
+        let b = CpuTensor::<f32>::from_buf(vec![50.0, 100.0], vec![2]).unwrap();
+        let c = &a.view() - &b.view();
+        assert_eq!(c.view().get(vec![0]).unwrap(), 100.0);
+        assert_eq!(c.view().get(vec![1]).unwrap(), 100.0);
+    }
+
+    #[test]
+    fn test_ref_tensorview_mul_ref_tensorview() {
+        let a = CpuTensor::<f32>::from_buf(vec![19.0, 20.0], vec![2]).unwrap();
+        let b = CpuTensor::<f32>::from_buf(vec![2.0, 5.0], vec![2]).unwrap();
+        let c = &a.view() * &b.view();
+        assert_eq!(c.view().get(vec![0]).unwrap(), 38.0);
+        assert_eq!(c.view().get(vec![1]).unwrap(), 100.0);
+    }
+
+    // --- &TensorViewMut op &TensorViewMut ---
+    #[test]
+    fn test_ref_tensorviewmut_add_ref_tensorviewmut() {
+        let mut a = CpuTensor::<f32>::ones((2, 3));
+        let mut b = CpuTensor::<f32>::ones((2, 3));
+        let c = &a.view_mut() + &b.view_mut();
+        assert_eq!(c.view().get(vec![0, 0]).unwrap(), 2.0);
+    }
+
+    #[test]
+    fn test_ref_tensorviewmut_sub_ref_tensorviewmut() {
+        let mut a = CpuTensor::<f32>::from_buf(vec![250.0, 300.0], vec![2]).unwrap();
+        let mut b = CpuTensor::<f32>::from_buf(vec![100.0, 150.0], vec![2]).unwrap();
+        let c = &a.view_mut() - &b.view_mut();
+        assert_eq!(c.view().get(vec![0]).unwrap(), 150.0);
+        assert_eq!(c.view().get(vec![1]).unwrap(), 150.0);
+    }
+
+    #[test]
+    fn test_ref_tensorviewmut_mul_ref_tensorviewmut() {
+        let mut a = CpuTensor::<f32>::from_buf(vec![21.0, 22.0], vec![2]).unwrap();
+        let mut b = CpuTensor::<f32>::from_buf(vec![3.0, 4.0], vec![2]).unwrap();
+        let c = &a.view_mut() * &b.view_mut();
+        assert_eq!(c.view().get(vec![0]).unwrap(), 63.0);
+        assert_eq!(c.view().get(vec![1]).unwrap(), 88.0);
+    }
+
+    // --- AddAssign/SubAssign/MulAssign for TensorViewMut ---
+    #[test]
+    fn test_tensorviewmut_add_assign_tensorbase() {
+        let mut a = CpuTensor::<f32>::ones((2, 3));
+        let b = CpuTensor::<f32>::ones((2, 3));
+        {
+            let mut view = a.view_mut();
+            view += b;
+        }
+        assert_eq!(a.view().get(vec![0, 0]).unwrap(), 2.0);
+    }
+
+    #[test]
+    fn test_tensorviewmut_sub_assign_tensorview() {
+        let mut a = CpuTensor::<f32>::from_buf(vec![10.0, 20.0], vec![2]).unwrap();
+        let b = CpuTensor::<f32>::from_buf(vec![3.0, 7.0], vec![2]).unwrap();
+        {
+            let mut view = a.view_mut();
+            view -= b.view();
+        }
+        assert_eq!(a.view().get(vec![0]).unwrap(), 7.0);
+        assert_eq!(a.view().get(vec![1]).unwrap(), 13.0);
+    }
+
+    #[test]
+    fn test_tensorviewmut_mul_assign_tensorviewmut() {
+        let mut a = CpuTensor::<f32>::from_buf(vec![5.0, 6.0], vec![2]).unwrap();
+        let mut b = CpuTensor::<f32>::from_buf(vec![2.0, 3.0], vec![2]).unwrap();
+        {
+            let mut view_a = a.view_mut();
+            let view_b = b.view_mut();
+            view_a *= view_b;
+        }
+        assert_eq!(a.view().get(vec![0]).unwrap(), 10.0);
+        assert_eq!(a.view().get(vec![1]).unwrap(), 18.0);
     }
 }
 
 #[cfg(feature = "cuda")]
 #[cfg(test)]
 mod cuda_tests {
-    use crate::{core::{primitives::CudaTensor, tensor::{AsView, AsViewMut, TensorAccess, TensorAccessMut}, CpuTensor, MetaTensorView}, ops::binary::PointwiseTensorOp};
+    use std::ops::Add;
+
+    use crate::{core::{primitives::CudaTensor, tensor::{AsView, AsViewMut, TensorAccess, TensorAccessMut}, CpuTensor, MetaTensorView}};
 
 
     #[test]
@@ -1887,7 +2396,7 @@ mod cuda_tests {
         let mut tensor = CudaTensor::<i32>::from_buf(vec![1, 2, 3], vec![3]).unwrap();
         let value = 10;
         let mut view = tensor.view_mut();
-        view += &value;
+        view += value;
         let expected = CpuTensor::<i32>::from_buf(vec![11, 12, 13], vec![3]).unwrap();
         assert_eq!(tensor.cpu().unwrap(), expected);
     }
@@ -2068,7 +2577,7 @@ mod cuda_tests {
         assert_eq!(row_slice.get(vec![0]).unwrap(), 5);
         assert_eq!(row_slice.get(vec![1]).unwrap(), 6);
         
-        row_slice += &value;
+        row_slice += value;
         
         let expected = CpuTensor::<i32>::from_buf(vec![1, 2, 3, 4, 1005, 1006, 7, 8], vec![2, 2, 2]).unwrap();
         assert_eq!(tensor.cpu().unwrap(), expected);
@@ -2096,7 +2605,7 @@ mod cuda_tests {
         let mut tensor = CudaTensor::<i32>::from_buf(vec![1, 2, 3], vec![3]).unwrap();
         let value = 10;
         let view = tensor.view_mut();
-        let result = view + &value;
+        let result = view + value;
         
         let expected_result = CpuTensor::<i32>::from_buf(vec![11, 12, 13], vec![3]).unwrap();
         assert_eq!(result.cpu().unwrap(), expected_result);
@@ -2735,7 +3244,7 @@ mod cuda_tests {
         view1 += value;  // Using owned value
         
         let mut view2 = tensor2.view_mut();
-        view2 += &value;  // Using reference
+        view2 += value;  // Using owned value
         
         assert_eq!(tensor1.cpu().unwrap(), tensor2.cpu().unwrap());
     }
@@ -3257,7 +3766,7 @@ mod cuda_tests {
         let vecb = CudaTensor::<f32>::ones((3, 1));
         veca.view_mut().set(vec![0, 0], 22.0).unwrap();
 
-        let vecc = &veca.view().add(&vecb.view()).expect("fail");
+        let vecc = &veca.add(vecb.view());
 
         assert_eq!(vecc.shape().clone(), vec![3, 3]);
         for i in 0..3usize {
@@ -3277,7 +3786,7 @@ mod cuda_tests {
         let vecb = CudaTensor::<f32>::ones((3, 1));
         veca.view_mut().set(vec![0, 0], 22.0).unwrap();
 
-        let vecc = &veca.view().add(&vecb.view()).expect("fail");
+        let vecc = &veca.add(vecb.view());
 
         assert_eq!(vecc.shape().clone(), vec![3, 1]);
         for i in 0..3usize {
@@ -3302,7 +3811,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::from_buf(vec![5.0], vec![]).unwrap(); // scalar
         let vecb = CudaTensor::<f32>::ones((2, 3, 4));
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast scalar to 3D");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![2, 3, 4]);
         for i in 0..2 {
@@ -3319,7 +3828,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::from_buf(vec![1.0, 2.0, 3.0], vec![3]).unwrap(); // (3,)
         let vecb = CudaTensor::<f32>::ones((2, 4, 3)); // (2, 4, 3)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (3,) to (2,4,3)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![2, 4, 3]);
         // Check pattern: last dimension should be [2, 3, 4] everywhere
@@ -3337,7 +3846,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::ones((3, 4)); // (3, 4)
         let vecb = CudaTensor::<f32>::ones((2, 3, 4)); // (2, 3, 4)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (3,4) to (2,3,4)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![2, 3, 4]);
         for i in 0..2 {
@@ -3354,7 +3863,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::ones((1, 3, 1)); // (1, 3, 1)
         let vecb = CudaTensor::<f32>::ones((2, 3, 4)); // (2, 3, 4)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (1,3,1) to (2,3,4)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![2, 3, 4]);
         for i in 0..2 {
@@ -3371,7 +3880,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::ones((3, 4)); // (3, 4)
         let vecb = CudaTensor::<f32>::ones((5, 3, 4)); // (5, 3, 4)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (3,4) to (5,3,4)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![5, 3, 4]);
         for i in 0..5 {
@@ -3390,7 +3899,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::from_buf(vec![10.0, 20.0], vec![2]).unwrap(); // (2,)
         let vecb = CudaTensor::<f32>::ones((3, 4, 5, 2)); // (3, 4, 5, 2)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (2,) to (3,4,5,2)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![3, 4, 5, 2]);
         // Check pattern in last dimension
@@ -3409,7 +3918,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::ones((1, 1, 5, 1)); // (1, 1, 5, 1)
         let vecb = CudaTensor::<f32>::ones((2, 3, 5, 4)); // (2, 3, 5, 4)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (1,1,5,1) to (2,3,5,4)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![2, 3, 5, 4]);
         for i in 0..2 {
@@ -3428,7 +3937,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::ones((3, 5, 4)); // (3, 5, 4)
         let vecb = CudaTensor::<f32>::ones((2, 3, 5, 4)); // (2, 3, 5, 4)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (3,5,4) to (2,3,5,4)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![2, 3, 5, 4]);
         for i in 0..2 {
@@ -3449,7 +3958,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::from_buf(vec![100.0], vec![]).unwrap(); // scalar
         let vecb = CudaTensor::<f32>::ones((2, 2, 2, 2, 2)); // (2, 2, 2, 2, 2)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast scalar to 5D");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![2, 2, 2, 2, 2]);
         for i in 0..2 {
@@ -3470,7 +3979,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::ones((1, 2, 1, 3, 1)); // (1, 2, 1, 3, 1)
         let vecb = CudaTensor::<f32>::ones((4, 2, 5, 3, 6)); // (4, 2, 5, 3, 6)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (1,2,1,3,1) to (4,2,5,3,6)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![4, 2, 5, 3, 6]);
         // Check a few representative values
@@ -3485,7 +3994,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::ones((3, 4)); // (3, 4)
         let vecb = CudaTensor::<f32>::ones((2, 5, 3, 4)); // (2, 5, 3, 4)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (3,4) to (2,5,3,4)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![2, 5, 3, 4]);
         for i in 0..2 {
@@ -3504,7 +4013,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::from_buf(vec![1.0, 2.0, 3.0], vec![3]).unwrap(); // (3,)
         let vecb = CudaTensor::<f32>::ones((2, 4, 5, 6, 3)); // (2, 4, 5, 6, 3)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (3,) to (2,4,5,6,3)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![2, 4, 5, 6, 3]);
         // Check pattern in last dimension
@@ -3530,7 +4039,7 @@ mod cuda_tests {
         let vecb = CudaTensor::<f32>::ones((2, 5, 6)); // (2, 5, 6) - incompatible!
         
         // This should panic because 4 != 6 and 3 != 5
-        let _vecc = veca.view().add(&vecb.view()).expect("Should fail - incompatible dims");
+        let _vecc = veca.add(vecb.view());
     }
 
     #[test]
@@ -3540,7 +4049,7 @@ mod cuda_tests {
         let vecb = CudaTensor::<f32>::ones((2, 3, 7)); // (2, 3, 7)
         
         // Should fail because 5 != 7
-        let _vecc = veca.view().add(&vecb.view()).expect("Should fail - 5 != 7");
+        let _vecc = veca.add(vecb.view());
     }
 
     #[test]
@@ -3550,7 +4059,7 @@ mod cuda_tests {
         let vecb = CudaTensor::<f32>::ones((2, 5, 4)); // (2, 5, 4)
         
         // Should fail because middle dimension 3 != 5 and neither is 1
-        let _vecc = veca.view().add(&vecb.view()).expect("Should fail - 3 != 5");
+        let _vecc = veca.add(vecb.view());
     }
 
     #[test]
@@ -3560,7 +4069,7 @@ mod cuda_tests {
         let vecb = CudaTensor::<f32>::ones((2, 7, 4, 5)); // (2, 7, 4, 5)
         
         // Should fail because 3 != 7
-        let _vecc = veca.view().add(&vecb.view()).expect("Should fail - 3 != 7");
+        let _vecc = veca.add(vecb.view());
     }
 
     #[test]
@@ -3570,7 +4079,7 @@ mod cuda_tests {
         let vecb = CudaTensor::<f32>::ones((6, 2, 7, 4, 5)); // (6, 2, 7, 4, 5)
         
         // Should fail because 3 != 7 (dim 2)
-        let _vecc = veca.view().add(&vecb.view()).expect("Should fail - 3 != 7");
+        let _vecc = veca.add(vecb.view());
     }
 
     #[test]
@@ -3580,7 +4089,7 @@ mod cuda_tests {
         let vecb = CudaTensor::<f32>::ones((4, 3, 6)); // (4, 3, 6)
         
         // Should fail because 5 != 3 and neither is 1
-        let _vecc = veca.view().add(&vecb.view()).expect("Should fail - 5 != 3");
+        let _vecc = veca.add(vecb.view());
     }
 
     // --- Edge Case Broadcasts ---
@@ -3590,7 +4099,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::ones((1, 1, 1)); // (1, 1, 1)
         let vecb = CudaTensor::<f32>::ones((5, 6, 7)); // (5, 6, 7)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (1,1,1) to (5,6,7)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![5, 6, 7]);
         assert_eq!(vecc.view().get(vec![0, 0, 0]).unwrap(), 2.0);
@@ -3602,7 +4111,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::ones((3, 4, 5)); // (3, 4, 5)
         let vecb = CudaTensor::<f32>::ones((3, 4, 5)); // (3, 4, 5)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should work - identical shapes");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![3, 4, 5]);
         for i in 0..3 {
@@ -3619,7 +4128,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::ones((1, 4, 1, 6)); // (1, 4, 1, 6)
         let vecb = CudaTensor::<f32>::ones((3, 1, 5, 1)); // (3, 1, 5, 1)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast to (3,4,5,6)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![3, 4, 5, 6]);
         assert_eq!(vecc.view().get(vec![0, 0, 0, 0]).unwrap(), 2.0);
@@ -3631,7 +4140,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::ones((3, 4, 1)); // (3, 4, 1)
         let vecb = CudaTensor::<f32>::ones((3, 4, 5)); // (3, 4, 5)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (3,4,1) to (3,4,5)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![3, 4, 5]);
         for i in 0..3 {
@@ -3648,7 +4157,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::ones((1, 4, 5)); // (1, 4, 5)
         let vecb = CudaTensor::<f32>::ones((3, 4, 5)); // (3, 4, 5)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (1,4,5) to (3,4,5)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(vecc.shape().clone(), vec![3, 4, 5]);
         for i in 0..3 {
@@ -3667,7 +4176,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::ones((4, 5)); // (4, 5)
         let vecb = CudaTensor::<f32>::ones((3, 4, 5)); // (3, 4, 5)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast");
+        let vecc = veca.add(vecb.view());
         
         // Expected output shape: (3, 4, 5)
         assert_eq!(*vecc.shape(), vec![3, 4, 5]);
@@ -3678,7 +4187,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::ones((7,)); // (7,)
         let vecb = CudaTensor::<f32>::ones((2, 3, 4, 7)); // (2, 3, 4, 7)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast");
+        let vecc = veca.add(vecb.view());
         
         // Expected output shape: (2, 3, 4, 7)
         assert_eq!(*vecc.shape(), vec![2, 3, 4, 7]);
@@ -3689,7 +4198,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::ones((1, 5, 1)); // (1, 5, 1)
         let vecb = CudaTensor::<f32>::ones((4, 5, 6)); // (4, 5, 6)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast");
+        let vecc = veca.add(vecb.view());
         
         // Expected output shape: (4, 5, 6)
         assert_eq!(*vecc.shape(), vec![4, 5, 6]);
@@ -3700,7 +4209,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::ones((5, 6)); // (5, 6)
         let vecb = CudaTensor::<f32>::ones((2, 3, 4, 5, 6)); // (2, 3, 4, 5, 6)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast");
+        let vecc = veca.add(vecb.view());
         
         // Expected output shape: (2, 3, 4, 5, 6)
         assert_eq!(*vecc.shape(), vec![2, 3, 4, 5, 6]);
@@ -3711,7 +4220,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::ones((1, 4, 1, 6)); // (1, 4, 1, 6)
         let vecb = CudaTensor::<f32>::ones((3, 1, 5, 6)); // (3, 1, 5, 6)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast");
+        let vecc = veca.add(vecb.view());
         
         // Expected output shape: (3, 4, 5, 6)
         assert_eq!(*vecc.shape(), vec![3, 4, 5, 6]);
@@ -3722,7 +4231,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::from_buf(vec![42.0], vec![]).unwrap(); // scalar
         let vecb = CudaTensor::<f32>::ones((2, 3, 4, 5, 6)); // (2, 3, 4, 5, 6)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast");
+        let vecc = veca.add(vecb.view());
         
         // Expected output shape: (2, 3, 4, 5, 6)
         assert_eq!(*vecc.shape(), vec![2, 3, 4, 5, 6]);
@@ -3733,7 +4242,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::ones((1, 1, 3, 1, 5)); // (1, 1, 3, 1, 5)
         let vecb = CudaTensor::<f32>::ones((2, 4, 3, 6, 5)); // (2, 4, 3, 6, 5)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast");
+        let vecc = veca.add(vecb.view());
         
         // Expected output shape: (2, 4, 3, 6, 5)
         assert_eq!(*vecc.shape(), vec![2, 4, 3, 6, 5]);
@@ -3751,7 +4260,7 @@ mod cuda_tests {
         veca.view_mut().set(vec![0, 0], 5.0).unwrap();
         veca.view_mut().set(vec![0, 1], 6.0).unwrap();
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (1,4) and (3,1) to (3,4)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(*vecc.shape(), vec![3, 4]);
         // First column should be 5+1=6, second column 6+1=7, rest 1+1=2
@@ -3771,7 +4280,7 @@ mod cuda_tests {
         veca.view_mut().set(vec![0, 0], 10.0).unwrap();
         veca.view_mut().set(vec![1, 0], 20.0).unwrap();
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast (4,1) and (1,5) to (4,5)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(*vecc.shape(), vec![4, 5]);
         // First row should all be 10+1=11, second row 20+1=21, rest 1+1=2
@@ -3789,7 +4298,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::ones((1, 3, 1)); // (1, 3, 1)
         let vecb = CudaTensor::<f32>::ones((2, 1, 4)); // (2, 1, 4)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast to (2,3,4)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(*vecc.shape(), vec![2, 3, 4]);
         for i in 0..2 {
@@ -3809,7 +4318,7 @@ mod cuda_tests {
         veca.view_mut().set(vec![0, 0, 0], 100.0).unwrap();
         vecb.view_mut().set(vec![0, 0, 0], 200.0).unwrap();
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast to (3,4,5)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(*vecc.shape(), vec![3, 4, 5]);
         // [0,0,0] should be 100+200=300
@@ -3829,7 +4338,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::ones((5, 1, 3)); // (5, 1, 3)
         let vecb = CudaTensor::<f32>::ones((1, 4, 3)); // (1, 4, 3)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast to (5,4,3)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(*vecc.shape(), vec![5, 4, 3]);
         // All values should be 2.0
@@ -3848,7 +4357,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::ones((1, 3, 1, 5)); // (1, 3, 1, 5)
         let vecb = CudaTensor::<f32>::ones((2, 1, 4, 1)); // (2, 1, 4, 1)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast to (2,3,4,5)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(*vecc.shape(), vec![2, 3, 4, 5]);
         // Spot check some values
@@ -3862,7 +4371,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::ones((1, 1, 6, 7)); // (1, 1, 6, 7)
         let vecb = CudaTensor::<f32>::ones((5, 4, 1, 1)); // (5, 4, 1, 1)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast to (5,4,6,7)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(*vecc.shape(), vec![5, 4, 6, 7]);
         // Check boundaries
@@ -3876,7 +4385,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::ones((1, 2, 1, 3, 1)); // (1, 2, 1, 3, 1)
         let vecb = CudaTensor::<f32>::ones((4, 1, 5, 1, 6)); // (4, 1, 5, 1, 6)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast to (4,2,5,3,6)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(*vecc.shape(), vec![4, 2, 5, 3, 6]);
         // Spot check
@@ -3890,7 +4399,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::ones((1, 3, 1, 1, 7)); // (1, 3, 1, 1, 7)
         let vecb = CudaTensor::<f32>::ones((2, 1, 4, 5, 1)); // (2, 1, 4, 5, 1)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast to (2,3,4,5,7)");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(*vecc.shape(), vec![2, 3, 4, 5, 7]);
         // Verify a few positions
@@ -3906,7 +4415,7 @@ mod cuda_tests {
         let veca = CudaTensor::<f32>::ones((1, 5)); // (1, 5)
         let vecb = CudaTensor::<f32>::ones((3, 1, 1)); // (3, 1, 1)
         
-        let vecc = veca.view().add(&vecb.view()).expect("Should broadcast");
+        let vecc = veca.add(vecb.view());
         
         assert_eq!(*vecc.shape(), vec![3, 1, 5]);
         for i in 0..3 {
@@ -3926,7 +4435,7 @@ mod cuda_tests {
         let vecb = CudaTensor::<f32>::ones((5, 1)); // (5, 1)
         
         // Should fail: 3 != 5 and 4 != 1
-        let _vecc = veca.view().add(&vecb.view()).expect("Should fail - 3 != 5");
+        let _vecc = veca.add(vecb.view());
     }
 
     #[test]
@@ -3937,7 +4446,7 @@ mod cuda_tests {
         let vecb = CudaTensor::<f32>::ones((1, 3, 5)); // (1, 3, 5)
         
         // Should fail: 4 != 5
-        let _vecc = veca.view().add(&vecb.view()).expect("Should fail - 4 != 5");
+        let _vecc = veca.add(vecb.view());
     }
 
     #[test]
@@ -3948,7 +4457,7 @@ mod cuda_tests {
         let vecb = CudaTensor::<f32>::ones((2, 1, 4, 7)); // (2, 1, 4, 7)
         
         // Should fail: 6 != 7
-        let _vecc = veca.view().add(&vecb.view()).expect("Should fail - 6 != 7");
+        let _vecc = veca.add(vecb.view());
     }
 
     #[test]
@@ -3960,6 +4469,311 @@ mod cuda_tests {
         let vecb = CudaTensor::<f32>::ones((3, 1, 5)); // (3, 1, 5)
         
         // Should fail: 2 != 3
-        let _vecc = veca.view().add(&vecb.view()).expect("Should fail - 2 != 3");
+        let _vecc = veca.add(vecb.view());
+    }
+
+    // ==================== SUBTRACTION BROADCASTING TESTS ====================
+
+    #[test]
+    fn test_broadcast_sub_scalar_to_vector_cuda() {
+        // (3,) - scalar -> (3,)
+        let veca = CudaTensor::<f32>::from_buf(vec![10.0, 20.0, 30.0], vec![3]).unwrap();
+        let scalar = 5.0;
+        
+        let vecc = veca - scalar;
+        
+        assert_eq!(*vecc.shape(), vec![3]);
+        assert_eq!(vecc.cpu().unwrap(), CpuTensor::<f32>::from_buf(vec![5.0, 15.0, 25.0], vec![3]).unwrap());
+    }
+
+    #[test]
+    fn test_broadcast_sub_vector_to_matrix_cuda() {
+        // (2, 3) - (3,) -> (2, 3)
+        let veca = CudaTensor::<f32>::from_buf(vec![10.0, 20.0, 30.0, 40.0, 50.0, 60.0], vec![2, 3]).unwrap();
+        let vecb = CudaTensor::<f32>::from_buf(vec![1.0, 2.0, 3.0], vec![3]).unwrap();
+        
+        let vecc = veca - vecb.view();
+        
+        assert_eq!(*vecc.shape(), vec![2, 3]);
+        assert_eq!(vecc.cpu().unwrap(), CpuTensor::<f32>::from_buf(vec![9.0, 18.0, 27.0, 39.0, 48.0, 57.0], vec![2, 3]).unwrap());
+    }
+
+    #[test]
+    fn test_broadcast_sub_column_to_matrix_cuda() {
+        // (2, 3) - (2, 1) -> (2, 3)
+        let veca = CudaTensor::<f32>::from_buf(vec![10.0, 20.0, 30.0, 40.0, 50.0, 60.0], vec![2, 3]).unwrap();
+        let vecb = CudaTensor::<f32>::from_buf(vec![5.0, 10.0], vec![2, 1]).unwrap();
+        
+        let vecc = veca - vecb.view();
+        
+        assert_eq!(*vecc.shape(), vec![2, 3]);
+        assert_eq!(vecc.cpu().unwrap(), CpuTensor::<f32>::from_buf(vec![5.0, 15.0, 25.0, 30.0, 40.0, 50.0], vec![2, 3]).unwrap());
+    }
+
+    #[test]
+    fn test_broadcast_sub_3d_singleton_cuda() {
+        // (2, 3, 4) - (1, 1, 4) -> (2, 3, 4)
+        let data_a: Vec<f32> = (0..24).map(|i| i as f32 * 10.0).collect();
+        let veca = CudaTensor::<f32>::from_buf(data_a, vec![2, 3, 4]).unwrap();
+        let vecb = CudaTensor::<f32>::from_buf(vec![1.0, 2.0, 3.0, 4.0], vec![1, 1, 4]).unwrap();
+        
+        let vecc = veca - vecb.view();
+        
+        assert_eq!(*vecc.shape(), vec![2, 3, 4]);
+        // Check first row: [0, 10, 20, 30] - [1, 2, 3, 4] = [-1, 8, 17, 26]
+        assert_eq!(vecc.view().get(vec![0, 0, 0]).unwrap(), -1.0);
+        assert_eq!(vecc.view().get(vec![0, 0, 1]).unwrap(), 8.0);
+        assert_eq!(vecc.view().get(vec![0, 0, 2]).unwrap(), 17.0);
+        assert_eq!(vecc.view().get(vec![0, 0, 3]).unwrap(), 26.0);
+    }
+
+    #[test]
+    fn test_broadcast_sub_different_ranks_cuda() {
+        // (3, 4) - (4,) -> (3, 4)
+        let data_a: Vec<f32> = (0..12).map(|i| i as f32 * 5.0).collect();
+        let veca = CudaTensor::<f32>::from_buf(data_a, vec![3, 4]).unwrap();
+        let vecb = CudaTensor::<f32>::from_buf(vec![1.0, 2.0, 3.0, 4.0], vec![4]).unwrap();
+        
+        let vecc = veca - vecb.view();
+        
+        assert_eq!(*vecc.shape(), vec![3, 4]);
+        // First row: [0, 5, 10, 15] - [1, 2, 3, 4] = [-1, 3, 7, 11]
+        assert_eq!(vecc.view().get(vec![0, 0]).unwrap(), -1.0);
+        assert_eq!(vecc.view().get(vec![0, 1]).unwrap(), 3.0);
+        assert_eq!(vecc.view().get(vec![0, 2]).unwrap(), 7.0);
+        assert_eq!(vecc.view().get(vec![0, 3]).unwrap(), 11.0);
+    }
+
+    #[test]
+    fn test_broadcast_sub_tensorview_cuda() {
+        // Test with TensorView (immutable view)
+        let veca = CudaTensor::<f32>::from_buf(vec![100.0, 200.0, 300.0, 400.0], vec![2, 2]).unwrap();
+        let vecb = CudaTensor::<f32>::from_buf(vec![10.0, 20.0], vec![2, 1]).unwrap();
+        
+        let vecc = veca.view() - vecb.view();
+        
+        assert_eq!(*vecc.shape(), vec![2, 2]);
+        assert_eq!(vecc.cpu().unwrap(), CpuTensor::<f32>::from_buf(vec![90.0, 190.0, 280.0, 380.0], vec![2, 2]).unwrap());
+    }
+
+    #[test]
+    fn test_broadcast_sub_tensorviewmut_cuda() {
+        // Test with TensorViewMut
+        let mut veca = CudaTensor::<f32>::from_buf(vec![50.0, 60.0, 70.0, 80.0, 90.0, 100.0], vec![2, 3]).unwrap();
+        let mut vecb = CudaTensor::<f32>::from_buf(vec![5.0, 10.0, 15.0], vec![3]).unwrap();
+        
+        let vecc = veca.view_mut() - vecb.view_mut();
+        
+        assert_eq!(*vecc.shape(), vec![2, 3]);
+        assert_eq!(vecc.cpu().unwrap(), CpuTensor::<f32>::from_buf(vec![45.0, 50.0, 55.0, 75.0, 80.0, 85.0], vec![2, 3]).unwrap());
+    }
+
+    #[test]
+    fn test_broadcast_sub_tensorbase_owned_cuda() {
+        // Test with owned TensorBase
+        let veca = CudaTensor::<f32>::from_buf(vec![20.0, 30.0, 40.0, 50.0], vec![2, 2]).unwrap();
+        let vecb = CudaTensor::<f32>::from_buf(vec![3.0, 7.0], vec![2]).unwrap();
+        
+        let vecc = veca - vecb;
+        
+        assert_eq!(*vecc.shape(), vec![2, 2]);
+        assert_eq!(vecc.cpu().unwrap(), CpuTensor::<f32>::from_buf(vec![17.0, 23.0, 37.0, 43.0], vec![2, 2]).unwrap());
+    }
+
+    // ==================== MULTIPLICATION BROADCASTING TESTS ====================
+
+    #[test]
+    fn test_broadcast_mul_scalar_to_vector_cuda() {
+        // (3,) * scalar -> (3,)
+        let veca = CudaTensor::<f32>::from_buf(vec![2.0, 3.0, 4.0], vec![3]).unwrap();
+        let scalar = 5.0;
+        
+        let vecc = veca * scalar;
+        
+        assert_eq!(*vecc.shape(), vec![3]);
+        assert_eq!(vecc.cpu().unwrap(), CpuTensor::<f32>::from_buf(vec![10.0, 15.0, 20.0], vec![3]).unwrap());
+    }
+
+    #[test]
+    fn test_broadcast_mul_vector_to_matrix_cuda() {
+        // (2, 3) * (3,) -> (2, 3)
+        let veca = CudaTensor::<f32>::from_buf(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![2, 3]).unwrap();
+        let vecb = CudaTensor::<f32>::from_buf(vec![10.0, 20.0, 30.0], vec![3]).unwrap();
+        
+        let vecc = veca * vecb.view();
+        
+        assert_eq!(*vecc.shape(), vec![2, 3]);
+        assert_eq!(vecc.cpu().unwrap(), CpuTensor::<f32>::from_buf(vec![10.0, 40.0, 90.0, 40.0, 100.0, 180.0], vec![2, 3]).unwrap());
+    }
+
+    #[test]
+    fn test_broadcast_mul_column_to_matrix_cuda() {
+        // (2, 3) * (2, 1) -> (2, 3)
+        let veca = CudaTensor::<f32>::from_buf(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![2, 3]).unwrap();
+        let vecb = CudaTensor::<f32>::from_buf(vec![10.0, 100.0], vec![2, 1]).unwrap();
+        
+        let vecc = veca * vecb.view();
+        
+        assert_eq!(*vecc.shape(), vec![2, 3]);
+        assert_eq!(vecc.cpu().unwrap(), CpuTensor::<f32>::from_buf(vec![10.0, 20.0, 30.0, 400.0, 500.0, 600.0], vec![2, 3]).unwrap());
+    }
+
+    #[test]
+    fn test_broadcast_mul_3d_singleton_cuda() {
+        // (2, 3, 4) * (1, 1, 4) -> (2, 3, 4)
+        let data_a: Vec<f32> = (1..=24).map(|i| i as f32).collect();
+        let veca = CudaTensor::<f32>::from_buf(data_a, vec![2, 3, 4]).unwrap();
+        let vecb = CudaTensor::<f32>::from_buf(vec![2.0, 3.0, 4.0, 5.0], vec![1, 1, 4]).unwrap();
+        
+        let vecc = veca * vecb.view();
+        
+        assert_eq!(*vecc.shape(), vec![2, 3, 4]);
+        // First row: [1, 2, 3, 4] * [2, 3, 4, 5] = [2, 6, 12, 20]
+        assert_eq!(vecc.view().get(vec![0, 0, 0]).unwrap(), 2.0);
+        assert_eq!(vecc.view().get(vec![0, 0, 1]).unwrap(), 6.0);
+        assert_eq!(vecc.view().get(vec![0, 0, 2]).unwrap(), 12.0);
+        assert_eq!(vecc.view().get(vec![0, 0, 3]).unwrap(), 20.0);
+    }
+
+    #[test]
+    fn test_broadcast_mul_different_ranks_cuda() {
+        // (3, 4) * (4,) -> (3, 4)
+        let data_a: Vec<f32> = (1..=12).map(|i| i as f32).collect();
+        let veca = CudaTensor::<f32>::from_buf(data_a, vec![3, 4]).unwrap();
+        let vecb = CudaTensor::<f32>::from_buf(vec![2.0, 3.0, 4.0, 5.0], vec![4]).unwrap();
+        
+        let vecc = veca * vecb.view();
+        
+        assert_eq!(*vecc.shape(), vec![3, 4]);
+        // First row: [1, 2, 3, 4] * [2, 3, 4, 5] = [2, 6, 12, 20]
+        assert_eq!(vecc.view().get(vec![0, 0]).unwrap(), 2.0);
+        assert_eq!(vecc.view().get(vec![0, 1]).unwrap(), 6.0);
+        assert_eq!(vecc.view().get(vec![0, 2]).unwrap(), 12.0);
+        assert_eq!(vecc.view().get(vec![0, 3]).unwrap(), 20.0);
+        // Second row: [5, 6, 7, 8] * [2, 3, 4, 5] = [10, 18, 28, 40]
+        assert_eq!(vecc.view().get(vec![1, 0]).unwrap(), 10.0);
+        assert_eq!(vecc.view().get(vec![1, 1]).unwrap(), 18.0);
+        assert_eq!(vecc.view().get(vec![1, 2]).unwrap(), 28.0);
+        assert_eq!(vecc.view().get(vec![1, 3]).unwrap(), 40.0);
+    }
+
+    #[test]
+    fn test_broadcast_mul_tensorview_cuda() {
+        // Test with TensorView (immutable view)
+        let veca = CudaTensor::<f32>::from_buf(vec![10.0, 20.0, 30.0, 40.0], vec![2, 2]).unwrap();
+        let vecb = CudaTensor::<f32>::from_buf(vec![2.0, 3.0], vec![2, 1]).unwrap();
+        
+        let vecc = veca.view() * vecb.view();
+        
+        assert_eq!(*vecc.shape(), vec![2, 2]);
+        assert_eq!(vecc.cpu().unwrap(), CpuTensor::<f32>::from_buf(vec![20.0, 40.0, 90.0, 120.0], vec![2, 2]).unwrap());
+    }
+
+    #[test]
+    fn test_broadcast_mul_tensorviewmut_cuda() {
+        // Test with TensorViewMut
+        let mut veca = CudaTensor::<f32>::from_buf(vec![5.0, 6.0, 7.0, 8.0, 9.0, 10.0], vec![2, 3]).unwrap();
+        let mut vecb = CudaTensor::<f32>::from_buf(vec![2.0, 3.0, 4.0], vec![3]).unwrap();
+        
+        let vecc = veca.view_mut() * vecb.view_mut();
+        
+        assert_eq!(*vecc.shape(), vec![2, 3]);
+        assert_eq!(vecc.cpu().unwrap(), CpuTensor::<f32>::from_buf(vec![10.0, 18.0, 28.0, 16.0, 27.0, 40.0], vec![2, 3]).unwrap());
+    }
+
+    #[test]
+    fn test_broadcast_mul_tensorbase_owned_cuda() {
+        // Test with owned TensorBase
+        let veca = CudaTensor::<f32>::from_buf(vec![2.0, 3.0, 4.0, 5.0], vec![2, 2]).unwrap();
+        let vecb = CudaTensor::<f32>::from_buf(vec![10.0, 100.0], vec![2]).unwrap();
+        
+        let vecc = veca * vecb;
+        
+        assert_eq!(*vecc.shape(), vec![2, 2]);
+        assert_eq!(vecc.cpu().unwrap(), CpuTensor::<f32>::from_buf(vec![20.0, 300.0, 40.0, 500.0], vec![2, 2]).unwrap());
+    }
+
+    #[test]
+    fn test_broadcast_mul_high_dimensional_cuda() {
+        // (2, 1, 3, 1) * (1, 4, 1, 5) -> (2, 4, 3, 5)
+        let veca = CudaTensor::<f32>::ones((2, 1, 3, 1));
+        let vecb = CudaTensor::<f32>::from_buf(vec![2.0; 20], vec![1, 4, 1, 5]).unwrap();
+        
+        let vecc = veca * vecb.view();
+        
+        assert_eq!(*vecc.shape(), vec![2, 4, 3, 5]);
+        // All should be 1.0 * 2.0 = 2.0
+        assert_eq!(vecc.view().get(vec![0, 0, 0, 0]).unwrap(), 2.0);
+        assert_eq!(vecc.view().get(vec![1, 3, 2, 4]).unwrap(), 2.0);
+    }
+
+    #[test]
+    fn test_broadcast_sub_high_dimensional_cuda() {
+        // (2, 1, 3, 1) - (1, 4, 1, 5) -> (2, 4, 3, 5)
+        let veca = CudaTensor::<f32>::from_buf(vec![10.0; 6], vec![2, 1, 3, 1]).unwrap();
+        let vecb = CudaTensor::<f32>::from_buf(vec![3.0; 20], vec![1, 4, 1, 5]).unwrap();
+        
+        let vecc = veca - vecb.view();
+        
+        assert_eq!(*vecc.shape(), vec![2, 4, 3, 5]);
+        // All should be 10.0 - 3.0 = 7.0
+        assert_eq!(vecc.view().get(vec![0, 0, 0, 0]).unwrap(), 7.0);
+        assert_eq!(vecc.view().get(vec![1, 3, 2, 4]).unwrap(), 7.0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_broadcast_sub_incompatible_cuda() {
+        // (3, 4) and (5,) are incompatible (4 != 5)
+        let veca = CudaTensor::<f32>::ones((3, 4));
+        let vecb = CudaTensor::<f32>::ones((5,));
+        
+        let _vecc = veca - vecb.view();
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_broadcast_mul_incompatible_cuda() {
+        // (2, 3) and (4,) are incompatible (3 != 4)
+        let veca = CudaTensor::<f32>::ones((2, 3));
+        let vecb = CudaTensor::<f32>::ones((4,));
+        
+        let _vecc = veca * vecb.view();
+    }
+
+    #[test]
+    fn test_tensorviewmut_add_assign_tensorbase_cuda() {
+        let mut a = CudaTensor::<f32>::ones((2, 3));
+        let b = CudaTensor::<f32>::ones((2, 3));
+        {
+            let mut view = a.view_mut();
+            view += b;
+        }
+        assert_eq!(a.view().get(vec![0, 0]).unwrap(), 2.0);
+    }
+
+    #[test]
+    fn test_tensorviewmut_sub_assign_tensorview_cuda() {
+        let mut a = CudaTensor::<f32>::from_buf(vec![10.0, 20.0], vec![2]).unwrap();
+        let b = CudaTensor::<f32>::from_buf(vec![3.0, 7.0], vec![2]).unwrap();
+        {
+            let mut view = a.view_mut();
+            view -= b.view();
+        }
+        assert_eq!(a.view().get(vec![0]).unwrap(), 7.0);
+        assert_eq!(a.view().get(vec![1]).unwrap(), 13.0);
+    }
+
+    #[test]
+    fn test_tensorviewmut_mul_assign_tensorviewmut_cuda() {
+        let mut a = CudaTensor::<f32>::from_buf(vec![5.0, 6.0], vec![2]).unwrap();
+        let mut b = CudaTensor::<f32>::from_buf(vec![2.0, 3.0], vec![2]).unwrap();
+        {
+            let mut view_a = a.view_mut();
+            let view_b = b.view_mut();
+            view_a *= view_b;
+        }
+        assert_eq!(a.view().get(vec![0]).unwrap(), 10.0);
+        assert_eq!(a.view().get(vec![1]).unwrap(), 18.0);
     }
 }

@@ -37,7 +37,8 @@ Goal is high performance ML stack with minimal dependencies and maximal flexibil
 ## missing tests
 
 - [ ] broadcasting large tensor
-- [ ] broadcasting other than +
+- [X] broadcasting other than +
+- [X] more add assign broadcast tests
 
 ## Creating Tensors
 
@@ -179,4 +180,12 @@ let result = a.view() + b.view();               // Shape: (3, 4, 5)
 let a = CpuTensor::<f32>::ones((1, 3, 1, 5));  // Shape: (1, 3, 1, 5)
 let b = CpuTensor::<f32>::ones((2, 1, 4, 1));  // Shape: (2, 1, 4, 1)
 let result = a.view() + b.view();               // Shape: (2, 3, 4, 5)
+```
+
+## Inplace Broadcasting Operations
+
+```rust
+let mut a = CpuTensor::<f32>::zeros((3, 4));
+let b = CpuTensor::<f32>::ones((4,));  // Vector of shape (4)
+a += b ;  // b broadcasts along rows of a
 ```

@@ -1,7 +1,7 @@
 
 use std::marker::PhantomData;
 
-use crate::{backend::{Backend}, core::{primitives::TensorBase, tensor::TensorError, value::{TensorValue}, MetaTensor, MetaTensorView, TensorView}};
+use crate::core::{tensor::TensorError, value::TensorValue, MetaTensor};
 pub mod add;
 pub mod sub;
 pub mod mul;
@@ -39,46 +39,6 @@ impl<T: TensorValue> ElementwiseBinaryTensorOp<T> {
     }
 }
 
-
-pub trait PointwiseTensorOp<T, B: Backend<T>> 
-where T: TensorValue
-{
-    fn add(&'_ self, other: &TensorView<T, B>) -> Result<TensorBase<T, B>, TensorError>;
-    // fn sub(&'_ self, other: &TensorView<T, B>) -> Result<TensorBase<T, B>, TensorError>;
-    // fn mul(&'_ self, other: &TensorView<T, B>) -> Result<TensorBase<T, B>, TensorError>;
-}
-
-impl <T, B> PointwiseTensorOp<T, B> for TensorView<'_, T, B> 
-where T: TensorValue,
-      B: Backend<T>
-{
-    fn add(&'_ self, other: &TensorView<T, B>) -> Result<TensorBase<T, B>, TensorError> {
-        let (out_shape, broadcast_stra, broadcast_strb) = compute_broadcasted_params(&self.meta, &other.meta)?;
-        let meta_a = MetaTensor::new(out_shape.clone(), broadcast_stra, self.offset());
-        let meta_b = MetaTensor::new(out_shape.clone(), broadcast_strb, other.offset());
-
-        let view_a = TensorView::from_parts(self.raw, self.backend, meta_a);
-        let view_b = TensorView::from_parts(other.raw, other.backend, meta_b);
-
-        let mut result = TensorBase::<T, B>::zeros(out_shape);
-
-        self.backend.broadcast(
-            (view_a.raw, &view_a.meta), 
-            (view_b.raw, &view_b.meta),
-            (&mut result.raw, &result.meta),
-            ElementwiseBinaryTensorOp::Add,
-        )?;
-
-        Ok(result)
-    }
-}
-
-/// the new shape is the broadcasted shape
-/// starting from the last dimension
-/// 1. If match, take the dimension
-/// 2. If one is 1, take the other dimension
-/// 3. If neither is 1 and they don't match, error
-/// 4. If one tensor has no more dimensions, take the other dimension
 pub(crate) fn compute_broadcasted_params(
     a: &MetaTensor,
     b: &MetaTensor,

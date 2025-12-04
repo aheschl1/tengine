@@ -1,30 +1,54 @@
-use std::{borrow::Borrow, ops::{Sub, SubAssign}};
+use std::{ops::{Sub, SubAssign}};
 
 use crate::{backend::Backend, core::{primitives::TensorBase, tensor::AsTensor, value::TensorValue, TensorView, TensorViewMut}, ops::unary::ElementwiseUnaryTensorOp};
 
-impl<'a, T, B, O> SubAssign<O> for TensorViewMut<'a, T, B> 
+impl<'a, T, B> SubAssign<T> for TensorViewMut<'a, T, B> 
     where T: TensorValue,
           B: Backend<T>,
-          O: Borrow<T>
 {
-    fn sub_assign(&mut self, rhs: O) {
+    fn sub_assign(&mut self, rhs: T) {
         self.backend.apply_elementwise(
             self.raw, 
-            ElementwiseUnaryTensorOp::Sub(*rhs.borrow()),
+            ElementwiseUnaryTensorOp::Sub(rhs),
             &self.meta
         ).unwrap();
     }
 }
 
-impl<T, B, O> SubAssign<O> for TensorBase<T, B> 
+impl<'a, T, B> SubAssign<&T> for TensorViewMut<'a, T, B> 
     where T: TensorValue,
           B: Backend<T>,
-          O: Borrow<T>
 {
-    fn sub_assign(&mut self, rhs: O) {
+    fn sub_assign(&mut self, rhs: &T) {
+        self.backend.apply_elementwise(
+            self.raw, 
+            ElementwiseUnaryTensorOp::Sub(*rhs),
+            &self.meta
+        ).unwrap();
+    }
+}
+
+impl<T, B> SubAssign<T> for TensorBase<T, B> 
+    where T: TensorValue,
+          B: Backend<T>,
+{
+    fn sub_assign(&mut self, rhs: T) {
         self.backend.apply_elementwise(
             &mut self.raw, 
-            ElementwiseUnaryTensorOp::Sub(*rhs.borrow()),
+            ElementwiseUnaryTensorOp::Sub(rhs),
+            &self.meta
+        ).unwrap();
+    }
+}
+
+impl<T, B> SubAssign<&T> for TensorBase<T, B> 
+    where T: TensorValue,
+          B: Backend<T>,
+{
+    fn sub_assign(&mut self, rhs: &T) {
+        self.backend.apply_elementwise(
+            &mut self.raw, 
+            ElementwiseUnaryTensorOp::Sub(*rhs),
             &self.meta
         ).unwrap();
     }
@@ -32,15 +56,28 @@ impl<T, B, O> SubAssign<O> for TensorBase<T, B>
 
 macro_rules! impl_sub {
     ($type:ty) => {
-        impl<'a, T, B, O> Sub<O> for $type
+        impl<'a, T, B> Sub<T> for $type
         where
             T: TensorValue,
             B: Backend<T>,
-            O: Borrow<T>,
         {
             type Output = TensorBase<T, B>;
 
-            fn sub(self, rhs: O) -> Self::Output {
+            fn sub(self, rhs: T) -> Self::Output {
+                let mut result = self.owned();
+                result -= rhs;
+                result
+            }
+        }
+
+        impl<'a, T, B> Sub<&T> for $type
+        where
+            T: TensorValue,
+            B: Backend<T>,
+        {
+            type Output = TensorBase<T, B>;
+
+            fn sub(self, rhs: &T) -> Self::Output {
                 let mut result = self.owned();
                 result -= rhs;
                 result

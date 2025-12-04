@@ -46,11 +46,18 @@ pub trait Backend<T: TensorValue> {
         stride: &[isize],
     ) -> Result<(), TensorError>;
 
-    fn broadcast(
+    /// Broadcast two tensors into a destination tensor according to broadcasting rules
+    /// 
+    /// # Safety
+    /// The caller must ensure that the pointers and metatensors are valid and that the destination
+    /// tensor has the correct shape to hold the broadcasted result of the two source tensors.
+    /// Dst and left may be the same buffer for in-place operations. It is vital that the caller ensures
+    /// the stride for the left buffer contains no zeros in this case.
+    unsafe fn broadcast(
         &self, 
-        left: (&Self::Buf, &MetaTensor), 
-        right: (&Self::Buf, &MetaTensor),
-        dst: (&mut Self::Buf, &MetaTensor),
+        left: (*const Self::Buf, &MetaTensor), 
+        right: (*const Self::Buf, &MetaTensor),
+        dst: (*mut Self::Buf, &MetaTensor),
         op: ElementwiseBinaryTensorOp<T>
     ) -> Result<(), TensorError>;
 

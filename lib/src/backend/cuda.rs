@@ -2,7 +2,7 @@ use std::sync::{atomic::{AtomicBool, Ordering}, Arc, LazyLock};
 
 use cudarc::driver::{CudaContext, CudaSlice, DevicePtr};
 
-use crate::{backend::Backend, core::{tensor::TensorError, value::TensorValue}, ops::unary::ElementwiseUnaryTensorOp};
+use crate::{backend::Backend, core::{tensor::TensorError, value::TensorValue, MetaTensor}, ops::unary::ElementwiseUnaryTensorOp};
 
 // Include bindgen-generated FFI declarations for CUDA kernel launchers
 #[allow(non_camel_case_types)]
@@ -336,11 +336,11 @@ impl<T: TensorValue> Backend<T> for Cuda {
         }
     }
 
-    fn broadcast(
+    unsafe fn broadcast(
         &self, 
-        left: (&Self::Buf, &crate::core::MetaTensor), 
-        right: (&Self::Buf, &crate::core::MetaTensor),
-        dst: (&mut Self::Buf, &crate::core::MetaTensor),
+        left: (*const Self::Buf, &MetaTensor), 
+        right: (*const Self::Buf, &MetaTensor),
+        dst: (*mut Self::Buf, &MetaTensor),
         op: crate::ops::binary::ElementwiseBinaryTensorOp<T>
     ) -> Result<(), TensorError> {
         let (lbuf, lmeta) = left;
@@ -375,9 +375,12 @@ impl<T: TensorValue> Backend<T> for Cuda {
 
         macro_rules! launch_broadcast {
             ($launch_fn:ident, $t:ty) => {{
-                let (lbuf_ptr, _) = lbuf.ptr.device_ptr(&stream);
-                let (rbuf_ptr, _) = rbuf.ptr.device_ptr(&stream);
-                let (dbuf_ptr, _) = dbuf.ptr.device_ptr(&stream);
+                // let (lbuf_ptr, _) = lbuf.ptr.device_ptr(&stream);
+                // let (rbuf_ptr, _) = rbuf.ptr.device_ptr(&stream);
+                // let (dbuf_ptr, _) = dbuf.ptr.device_ptr(&stream);
+                let lbuf_ptr = unsafe { (*lbuf).ptr.device_ptr(&stream).0 };
+                let rbuf_ptr = unsafe { (*rbuf).ptr.device_ptr(&stream).0 };
+                let dbuf_ptr = unsafe { (*dbuf).ptr.device_ptr(&stream).0 };
                 
                 unsafe {
                     $launch_fn(
