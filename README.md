@@ -22,6 +22,7 @@ Goal is high performance ML stack with minimal dependencies and maximal flexibil
 - [X] Broadcasting
 - [ ] Idx should not be ref. makes it less ergonomic
 - [ ] Pull out ops into crate defined traits, which return Result, and call that from Add and AddAssign impls (panic there)
+- [ ] Figure outt bool types, and in general those without Add, Sub, and Mul impls
 
 ## to optimize
 
@@ -64,13 +65,12 @@ let tensor = TensorBase::<f32, Cuda>::from_buf(buf, (4, 4));
 
 ```rust
 let mut a = CpuTensor::<f32>::ones((2, 2));
-let view = a.view_mut();
 
 a*= 3.0; 
 a+= 2.0;
 a-= 1.0;
 
-let b: CpuTensor::<f32> = a.view() * 2.0; 
+let b: CpuTensor::<f32> = a * 2.0; 
 ```
 
 ## Slicing Syntax
