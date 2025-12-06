@@ -92,12 +92,12 @@ where
     /// Builds a tensor view from raw storage and metadata. No copying occurs;
     /// caller guarantees that `meta` correctly describes the layout within `raw`.
     pub(crate) fn from_parts(
-        raw: &'a B::Buf,
+        buf: &'a B::Buf,
         backend: &'a B,
         meta: MetaTensor
     ) -> Self {
         Self {
-            buf: raw,
+            buf,
             backend,
             meta,
         }

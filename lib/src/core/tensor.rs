@@ -206,6 +206,7 @@ pub trait TensorAccess<T: TensorValue, B: Backend<T>>: Sized {
 
     fn permute(&self, dims: impl Into<Idx>) -> Result<TensorView<'_, T, B>, TensorError>;
     fn transpose(&self) -> Result<TensorView<'_, T, B>, TensorError>;
+    fn unsqueeze(&self) -> Result<TensorView<'_, T, B>, TensorError>;
 }
 
 pub trait TensorAccessMut<T: TensorValue, B: Backend<T>>: TensorAccess<T, B> {
@@ -220,6 +221,7 @@ pub trait TensorAccessMut<T: TensorValue, B: Backend<T>>: TensorAccess<T, B> {
 
     fn permute_mut(&mut self, dims: impl Into<Idx>) -> Result<TensorViewMut<'_, T, B>, TensorError> ;
     fn transpose_mut(&mut self) -> Result<TensorViewMut<'_, T, B>, TensorError>;
+    fn unsqueeze_mut(&mut self) -> Result<TensorViewMut<'_, T, B>, TensorError>;
 }
 
 impl<T: TensorValue, B: Backend<T>, V> TensorAccess<T, B> for V
@@ -277,6 +279,21 @@ where B: Backend<T>, V: AsView<T, B>
         let dims: Idx = Idx::Coord((0..rank).rev().collect());
         self.permute(dims)
     }
+    
+    fn unsqueeze(&self) -> Result<TensorView<'_, T, B>, TensorError> {
+        let view = self.view();
+        let (new_shape, new_strides) = compute_unsqueezed_parameters(
+            view.meta.shape(),
+            view.meta.strides()
+        );
+
+        let res = TensorView::from_parts(
+            view.buf, 
+            view.backend, 
+            MetaTensor::new(new_shape, new_strides, view.meta.offset())
+        );
+        Ok(res)
+    }
 }
 
 impl<T: TensorValue, B: Backend<T>, V> TensorAccessMut<T, B> for V
@@ -321,6 +338,21 @@ where V: AsViewMut<T, B>
         let rank = self.view().meta.rank();
         let dims: Idx = Idx::Coord((0..rank).rev().collect());
         self.permute_mut(dims)
+    }
+
+    fn unsqueeze_mut(&mut self) -> Result<TensorViewMut<'_, T, B>, TensorError> {
+        let view = self.view_mut();
+        let (new_shape, new_strides) = compute_unsqueezed_parameters(
+            view.meta.shape(),
+            view.meta.strides()
+        );
+
+        let res = TensorViewMut::from_parts(
+            view.buf, 
+            view.backend, 
+            MetaTensor::new(new_shape, new_strides, view.meta.offset())
+        );
+        Ok(res)
     }
 
 }
@@ -390,4 +422,17 @@ fn compute_permuted_parameters(shape: &Shape, stride: &Strides, dims: &Idx) -> R
     }
 
     Ok((new_shape.into(), new_stride.into()))
+}
+
+#[inline]
+fn compute_unsqueezed_parameters(shape: &Shape, stride: &Strides) -> (Shape, Strides) {
+    let mut new_strides = stride.clone();
+    let mut new_shape = shape.clone();
+
+    let lstr = *new_strides.0.get(0).unwrap_or(&1);
+    let lsh = *new_shape.0.get(0).unwrap_or(&1) as isize;
+    new_strides.0.insert(0, lstr * lsh);
+    new_shape.0.insert(0, 1);
+
+    (new_shape, new_strides)
 }
