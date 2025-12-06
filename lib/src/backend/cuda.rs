@@ -424,11 +424,16 @@ impl<T: TensorValue> Backend<T> for Cuda {
     
     fn matmul(
         &self,
-        lhs: (MetaTensor, &Self::Buf), 
-        rhs: (MetaTensor, &Self::Buf)
+        lhs_buf: &Self::Buf,
+        rhs_buf: &Self::Buf,
+        lhs_offset: usize,
+        rhs_offset: usize,
+        b: usize,
+        m: usize,
+        k: usize,
+        n: usize,
     ) -> Result<Self::Buf, TensorError> {
         todo!()
     }
-
     
 }

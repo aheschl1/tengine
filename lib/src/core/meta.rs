@@ -99,6 +99,10 @@ impl Shape {
         self.0.contains(dim)
     }
 
+    pub fn size(&self) -> usize {
+        self.0.iter().product()
+    }
+
     pub fn squash_leading_dims(&self, n: usize) -> Shape {
         if n == 0 || self.is_empty() {
             return self.clone();
@@ -439,6 +443,12 @@ impl From<Vec<Dim>> for Shape {
     }
 }
 
+impl From<&[Dim]> for Shape {
+    fn from(slice: &[Dim]) -> Self {
+        Shape(slice.to_vec())
+    }
+}
+
 impl AsRef<[Dim]> for Shape {
     fn as_ref(&self) -> &[Dim] {
         &self.0
@@ -484,6 +494,12 @@ impl From<Strides> for Vec<isize> {
 impl From<Vec<isize>> for Strides {
     fn from(v: Vec<isize>) -> Self {
         Strides(v)
+    }
+}
+
+impl From<&[isize]> for Strides {
+    fn from(slice: &[isize]) -> Self {
+        Strides(slice.to_vec())
     }
 }
 

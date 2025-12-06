@@ -173,71 +173,248 @@ impl<T: TensorValue> Backend<T> for Cpu {
     
     fn matmul(
         &self,
-        lhs: (MetaTensor, &Self::Buf), 
-        rhs: (MetaTensor, &Self::Buf)
-    ) -> Result<Self::Buf, TensorError> {
-        // ugly placeholder
-        let (lhs_meta, lhs_buf) = lhs;
-        let (rhs_meta, rhs_buf) = rhs;
+        lhs_buf: &Self::Buf,
+        rhs_buf: &Self::Buf,
+        lhs_offset: usize,
+        rhs_offset: usize,
+        b: usize,
+        m: usize,
+        k: usize,
+        n: usize,
+    ) -> Result<Self::Buf, TensorError>{
+        let mut out_buf = self.alloc(b * m * n)?;
 
-        if lhs_meta.rank() != rhs_meta.rank() {
-            return Err(TensorError::InvalidShape);
-        }
-        if lhs_meta.rank() < 2{
-            return Err(TensorError::InvalidShape);
-        }
-        if lhs_meta.rank() > 3{
-            return Err(TensorError::InvalidShape);
-        }
+        for batch in 0..b {
+            let lhs_batch = lhs_offset + batch * m * k;
+            let rhs_batch = rhs_offset + batch * k * n;
+            let out_batch = batch * m * n;
 
-
-        let batched = lhs_meta.rank() == 3;
-
-        if batched {
-            let b = lhs_meta.shape[0]; // batch
-            let n = lhs_meta.shape[1]; // rows
-            let m = lhs_meta.shape[2]; // cols
-
-            if rhs_meta.shape[0] != b {
-                return Err(TensorError::SizeMismatch);
-            }
-            let p = rhs_meta.shape[1]; // cols
-            let q = rhs_meta.shape[2]; // rows
-            
-            if m != p {
-                return Err(TensorError::SizeMismatch);
-            }
-
-            //
-            //R^{n x m} * R^{m x q} = R^{n x q}
-            //
-
-            let mut dst_buf: Box<[T]> = self.alloc(b * n * q)?;
-            for batch in 0..b {
-                for row in 0..n {
-                    for col in 0..q {
-                        let mut acc = T::zero();
-                        for k in 0..m {
-                            let lhs_idx = batch * n * m + row * m + k;
-                            let rhs_idx = batch * p * q + k * q + col;
-                            unsafe {
-                                let lval = lhs_buf.get_unchecked(lhs_idx);
-                                let rval = rhs_buf.get_unchecked(rhs_idx);
-                                acc = acc + (*lval) * (*rval);
-                            }
-                        }
-                        let dst_idx = batch * n * q + row * q + col;
-                        unsafe {
-                            let slot = dst_buf.get_unchecked_mut(dst_idx);
-                            *slot = acc;
-                        }
+            for row in 0..m {
+                for col in 0..n {
+                    let mut sum = T::default();
+                    for inner in 0..k {
+                        let lhs_idx = lhs_batch + row * k + inner;
+                        let rhs_idx = rhs_batch + inner * n + col;
+                        sum = sum + lhs_buf[lhs_idx] * rhs_buf[rhs_idx];
                     }
+                    out_buf[out_batch + row * n + col] = sum;
                 }
             }
+        }
 
-            Ok(dst_buf)
-        }else{
-            Err(TensorError::InvalidShape)
+        Ok(out_buf)
+    }
+
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::openblas::*;
+    use std::ffi::CStr;
+
+    #[test]
+    fn test_openblas_info() {
+        unsafe {
+            // Get OpenBLAS information
+            let config = openblas_get_config();
+            let config_str = CStr::from_ptr(config).to_string_lossy();
+            println!("OpenBLAS Config: {}", config_str);
+            
+            let corename = openblas_get_corename();
+            let corename_str = CStr::from_ptr(corename).to_string_lossy();
+            println!("OpenBLAS Core: {}", corename_str);
+            
+            let num_procs = openblas_get_num_procs();
+            println!("Number of processors: {}", num_procs);
+            assert!(num_procs > 0);
+            
+            let num_threads = openblas_get_num_threads();
+            println!("Number of threads: {}", num_threads);
+            assert!(num_threads > 0);
+        }
+    }
+
+    #[test]
+    fn test_openblas_set_threads() {
+        unsafe {
+            let original_threads = openblas_get_num_threads();
+            
+            // Set to 4 threads
+            openblas_set_num_threads(4);
+            assert_eq!(openblas_get_num_threads(), 4);
+            
+            // Restore original
+            openblas_set_num_threads(original_threads);
+            assert_eq!(openblas_get_num_threads(), original_threads);
+        }
+    }
+
+    #[test]
+    fn test_cblas_dot_product() {
+        unsafe {
+            // Test single precision dot product
+            let x = vec![1.0f32, 2.0, 3.0, 4.0];
+            let y = vec![5.0f32, 6.0, 7.0, 8.0];
+            
+            let result = cblas_sdot(
+                x.len() as blasint,
+                x.as_ptr(),
+                1,
+                y.as_ptr(),
+                1
+            );
+            
+            // Expected: 1*5 + 2*6 + 3*7 + 4*8 = 5 + 12 + 21 + 32 = 70
+            let expected = x.iter().zip(y.iter()).map(|(a, b)| a * b).sum::<f32>();
+            assert_eq!(result, expected);
+            assert_eq!(result, 70.0);
+        }
+    }
+
+    #[test]
+    fn test_cblas_dot_product_double() {
+        unsafe {
+            // Test double precision dot product
+            let x = vec![1.0f64, 2.0, 3.0, 4.0];
+            let y = vec![5.0f64, 6.0, 7.0, 8.0];
+            
+            let result = cblas_ddot(
+                x.len() as blasint,
+                x.as_ptr(),
+                1,
+                y.as_ptr(),
+                1
+            );
+            
+            let expected = x.iter().zip(y.iter()).map(|(a, b)| a * b).sum::<f64>();
+            assert_eq!(result, expected);
+            assert_eq!(result, 70.0);
+        }
+    }
+
+    #[test]
+    fn test_cblas_gemv() {
+        unsafe {
+            // Matrix-vector multiplication: y = A * x
+            // A is 2x3, x is 3x1, result should be 2x1
+            #[rustfmt::skip]
+            let a = vec![
+                1.0f32, 2.0, 3.0,
+                4.0, 5.0, 6.0,
+            ];
+            let x = vec![1.0f32, 2.0, 3.0];
+            let mut y = vec![0.0f32, 0.0];
+            
+            cblas_sgemv(
+                CBLAS_ORDER::CblasRowMajor,
+                CBLAS_TRANSPOSE::CblasNoTrans,
+                2,  // m: number of rows in A
+                3,  // n: number of columns in A
+                1.0,  // alpha
+                a.as_ptr(),
+                3,  // lda: leading dimension of A
+                x.as_ptr(),
+                1,  // incx
+                0.0,  // beta
+                y.as_mut_ptr(),
+                1,  // incy
+            );
+            
+            // Expected: [1*1 + 2*2 + 3*3, 4*1 + 5*2 + 6*3] = [14, 32]
+            assert_eq!(y[0], 14.0);
+            assert_eq!(y[1], 32.0);
+        }
+    }
+
+    #[test]
+    fn test_cblas_gemm() {
+        unsafe {
+            // Matrix-matrix multiplication: C = A * B
+            // A is 2x3, B is 3x2, C should be 2x2
+            #[rustfmt::skip]
+            let a = vec![
+                1.0f32, 2.0, 3.0,
+                4.0, 5.0, 6.0,
+            ];
+            #[rustfmt::skip]
+            let b = vec![
+                7.0f32, 8.0,
+                9.0, 10.0,
+                11.0, 12.0,
+            ];
+            let mut c = vec![0.0f32; 4];
+            
+            cblas_sgemm(
+                CBLAS_ORDER::CblasRowMajor,
+                CBLAS_TRANSPOSE::CblasNoTrans,
+                CBLAS_TRANSPOSE::CblasNoTrans,
+                2,  // m: rows in A and C
+                2,  // n: columns in B and C
+                3,  // k: columns in A, rows in B
+                1.0,  // alpha
+                a.as_ptr(),
+                3,  // lda
+                b.as_ptr(),
+                2,  // ldb
+                0.0,  // beta
+                c.as_mut_ptr(),
+                2,  // ldc
+            );
+            
+            // Expected:
+            // C[0,0] = 1*7 + 2*9 + 3*11 = 7 + 18 + 33 = 58
+            // C[0,1] = 1*8 + 2*10 + 3*12 = 8 + 20 + 36 = 64
+            // C[1,0] = 4*7 + 5*9 + 6*11 = 28 + 45 + 66 = 139
+            // C[1,1] = 4*8 + 5*10 + 6*12 = 32 + 50 + 72 = 154
+            assert_eq!(c[0], 58.0);
+            assert_eq!(c[1], 64.0);
+            assert_eq!(c[2], 139.0);
+            assert_eq!(c[3], 154.0);
+        }
+    }
+
+    #[test]
+    fn test_cblas_gemm_double() {
+        unsafe {
+            // Test double precision matrix multiplication
+            #[rustfmt::skip]
+            let a = vec![
+                1.0f64, 2.0,
+                3.0, 4.0,
+            ];
+            #[rustfmt::skip]
+            let b = vec![
+                5.0f64, 6.0,
+                7.0, 8.0,
+            ];
+            let mut c = vec![0.0f64; 4];
+            
+            cblas_dgemm(
+                CBLAS_ORDER::CblasRowMajor,
+                CBLAS_TRANSPOSE::CblasNoTrans,
+                CBLAS_TRANSPOSE::CblasNoTrans,
+                2,  // m
+                2,  // n
+                2,  // k
+                1.0,  // alpha
+                a.as_ptr(),
+                2,  // lda
+                b.as_ptr(),
+                2,  // ldb
+                0.0,  // beta
+                c.as_mut_ptr(),
+                2,  // ldc
+            );
+            
+            // Expected:
+            // C[0,0] = 1*5 + 2*7 = 19
+            // C[0,1] = 1*6 + 2*8 = 22
+            // C[1,0] = 3*5 + 4*7 = 43
+            // C[1,1] = 3*6 + 4*8 = 50
+            assert_eq!(c[0], 19.0);
+            assert_eq!(c[1], 22.0);
+            assert_eq!(c[2], 43.0);
+            assert_eq!(c[3], 50.0);
         }
     }
 }
