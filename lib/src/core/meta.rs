@@ -5,7 +5,7 @@ use crate::{backend::Backend, core::{primitives::TensorBase, value::TensorValue,
 use super::primitives::TensorView;
 
 pub type Dim = usize;
-pub type Stride = Vec<isize>;
+pub type Strides = Vec<isize>;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Shape(pub Vec<Dim>);
@@ -64,13 +64,13 @@ impl PartialEq<Vec<Dim>> for Shape {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct MetaTensor {
     pub shape: Shape,
-    pub strides: Stride, //afine
+    pub strides: Strides, //afine
     pub offset: usize,
 }
 
 impl MetaTensor {
     /// Creates tensor metadata with explicit shape, stride and offset.
-    pub fn new(shape: impl Into<Shape>, stride: Stride, offset: usize) -> Self {
+    pub fn new(shape: impl Into<Shape>, stride: Strides, offset: usize) -> Self {
         Self { shape: shape.into(), strides: stride, offset }
     }
 
@@ -90,7 +90,7 @@ impl MetaTensor {
     /// Borrow the shape vector.
     pub fn shape(&self) -> &Shape { &self.shape }
     /// Borrow the stride vector.
-    pub fn strides(&self) -> &Stride { &self.strides }
+    pub fn strides(&self) -> &Strides { &self.strides }
     /// Return the starting offset (in elements) into the underlying buffer.
     pub fn offset(&self) -> usize { self.offset }
     /// Returns the size of a single dimension by index.
@@ -245,7 +245,7 @@ impl<'a> Iterator for CoordIter<'a> {
 
 
 /// Computes the standard row-major stride for a given shape.
-pub fn shape_to_stride(shape: &Shape) -> Stride {
+pub fn shape_to_stride(shape: &Shape) -> Strides {
     let mut stride: Vec<isize> = vec![1; shape.len()];
     for i in (0..shape.len()).rev() {
         if i < shape.len() - 1 {
@@ -259,7 +259,7 @@ pub fn shape_to_stride(shape: &Shape) -> Stride {
 /// Checks whether a layout (shape/stride) is contiguous in a relaxed sense:
 /// ignores singleton dimensions and accepts empty shapes.
 #[inline]
-pub(crate) fn is_contiguous_relaxed(shape: &Shape, stride: &Stride) -> bool {
+pub(crate) fn is_contiguous_relaxed(shape: &Shape, stride: &Strides) -> bool {
     if shape.is_empty() { return true; }
     if shape.contains(&0) { return true; }
     if shape.len() != stride.len() { return false; }
@@ -283,7 +283,7 @@ pub trait MetaTensorView {
     /// Borrow the shape vector.
     fn shape(&self) -> &Shape { &self.meta().shape }
     /// Borrow the stride vector.
-    fn stride(&self) -> &Stride { &self.meta().strides }
+    fn stride(&self) -> &Strides { &self.meta().strides }
     /// Starting offset (in elements) into the underlying buffer.
     fn offset(&self) -> usize { self.meta().offset }
     /// Number of dimensions (rank).

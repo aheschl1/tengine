@@ -6,14 +6,14 @@ pub mod idx;
 pub mod value;
 pub mod slice;
 
-pub use meta::{Dim, Shape, Stride, MetaTensor, MetaTensorView, shape_to_stride};
+pub use meta::{Dim, Shape, Strides, MetaTensor, MetaTensorView, shape_to_stride};
 pub use primitives::{Tensor, TensorView, CpuTensorView, TensorViewMut};
 pub use slice::Slice;
 
 
 #[cfg(test)]
 mod tests {
-    use crate::{backend::Backend, coord, core::{idx::Idx, tensor::{AsTensor, AsView, AsViewMut, TensorAccess, TensorAccessMut, TensorError}, value::TensorValue, MetaTensor, MetaTensorView, Shape, Slice, Stride, Tensor}};
+    use crate::{backend::Backend, coord, core::{idx::Idx, tensor::{AsTensor, AsView, AsViewMut, TensorAccess, TensorAccessMut, TensorError}, value::TensorValue, MetaTensor, MetaTensorView, Shape, Slice, Strides, Tensor}};
 
     fn make_tensor<T: TensorValue>(buf: Vec<T>, shape: impl Into<Shape>) -> Tensor<T> {
         Tensor::from_buf(buf, shape.into()).unwrap()
@@ -1017,7 +1017,7 @@ mod tests {
     #[test]
     fn test_shape_to_stride() {
         let shape = vec![2, 2, 3];
-        let stride: Stride = super::shape_to_stride(&shape.into());
+        let stride: Strides = super::shape_to_stride(&shape.into());
 
         assert_eq!(stride, vec![6, 3, 1]);
     }
@@ -1025,7 +1025,7 @@ mod tests {
     #[test]
     fn test_shape_to_stride_single_dim() {
         let shape = vec![4];
-        let stride: Stride = super::shape_to_stride(&shape.into());
+        let stride: Strides = super::shape_to_stride(&shape.into());
 
         assert_eq!(stride, vec![1]);
     }
@@ -1033,7 +1033,7 @@ mod tests {
     #[test]
     fn test_shape_to_stride_empty() {
         let shape: Shape = Shape::empty();
-        let stride: Stride = super::shape_to_stride(&shape);
+        let stride: Strides = super::shape_to_stride(&shape);
 
         assert!(stride.is_empty());
     }
@@ -1041,7 +1041,7 @@ mod tests {
     #[test]
     fn test_shape_to_stride_ones() {
         let shape = vec![1, 1, 1];
-        let stride: Stride = super::shape_to_stride(&shape.into());
+        let stride: Strides = super::shape_to_stride(&shape.into());
 
         assert_eq!(stride, vec![1, 1, 1]);
     }
@@ -1049,7 +1049,7 @@ mod tests {
     #[test]
     fn test_shape_to_stride_mixed() {
         let shape = vec![5, 1, 2];
-        let stride: Stride = super::shape_to_stride(&shape.into());
+        let stride: Strides = super::shape_to_stride(&shape.into());
 
         assert_eq!(stride, vec![2, 2, 1]);
     }
@@ -1057,7 +1057,7 @@ mod tests {
     #[test]
     fn test_shape_to_stride_larger() {
         let shape = vec![3, 4, 5];
-        let stride: Stride = super::shape_to_stride(&shape.into());
+        let stride: Strides = super::shape_to_stride(&shape.into());
 
         assert_eq!(stride, vec![20, 5, 1]);
     }

@@ -1,5 +1,5 @@
 use std::ops::{Range, RangeBounds, RangeFrom, RangeTo, RangeInclusive, RangeFull};
-use super::{Shape, Stride};
+use super::{Shape, Strides};
 use super::tensor::TensorError;
 
 
@@ -129,11 +129,11 @@ impl RangeBounds<usize> for Slice {
 /// - `InvalidShape` if step is 0
 pub(crate) fn compute_sliced_parameters(
     shape: &Shape,
-    stride: &Stride,
+    stride: &Strides,
     offset: usize,
     dim: usize,
     slice: impl Into<Slice>
-) -> Result<(Shape, Stride, usize), TensorError>
+) -> Result<(Shape, Strides, usize), TensorError>
 {
     let slice: Slice = slice.into();
 

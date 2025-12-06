@@ -1,5 +1,5 @@
 
-use crate::{backend::Backend, core::{idx::Idx, primitives::TensorBase, value::TensorValue, Dim, MetaTensor, Stride, TensorView, TensorViewMut}};
+use crate::{backend::Backend, core::{idx::Idx, primitives::TensorBase, value::TensorValue, Dim, MetaTensor, Shape, Strides, TensorView, TensorViewMut}};
 use super::slice::{Slice, compute_sliced_parameters};
 use thiserror::Error;
 
@@ -155,6 +155,8 @@ pub trait TensorAccess<T: TensorValue, B: Backend<T>>: Sized {
     fn slice_at(&self, dim: Dim, at: usize) -> Result<TensorView<'_, T, B>, TensorError> where Self: Sized{
         self.slice(dim, at)
     }
+
+    fn permute(&self, dims: impl Into<Idx>) -> Result<TensorView<'_, T, B>, TensorError>;
 }
 
 pub trait TensorAccessMut<T: TensorValue, B: Backend<T>>: TensorAccess<T, B> {
@@ -166,6 +168,8 @@ pub trait TensorAccessMut<T: TensorValue, B: Backend<T>>: TensorAccess<T, B> {
     fn slice_at_mut(&mut self, dim: Dim, idx: Dim) -> Result<TensorViewMut<'_, T, B>, TensorError> where Self: Sized{
         self.slice_mut(dim, idx)
     }
+
+    fn permute_mut(&mut self, dims: impl Into<Idx>) -> Result<TensorViewMut<'_, T, B>, TensorError> ;
 }
 
 impl<T: TensorValue, B: Backend<T>, V> TensorAccess<T, B> for V
@@ -202,6 +206,20 @@ where B: Backend<T>, V: AsView<T, B>
         let v = TensorView::from_parts(view.raw, view.backend, MetaTensor::new(new_shape, new_stride, offset));
         Ok(v)
     }
+    
+    fn permute(&self, dims: impl Into<Idx>) -> Result<TensorView<'_, T, B>, TensorError> {
+        let mut view = self.view();
+        let (new_shape, new_stride) = compute_permuted_parameters(
+            view.meta.shape(),
+            view.meta.strides(),
+            &dims.into()
+        )?;
+
+        view.meta.shape = new_shape;
+        view.meta.strides = new_stride;
+
+        Ok(view)
+    }
 }
 
 impl<T: TensorValue, B: Backend<T>, V> TensorAccessMut<T, B> for V
@@ -228,6 +246,20 @@ where V: AsViewMut<T, B>
         view.backend.write(view.raw, buf_idx, value)
     }
 
+    fn permute_mut(&mut self, dims: impl Into<Idx>) -> Result<TensorViewMut<'_, T, B>, TensorError> {
+        let mut view = self.view_mut();
+        let (new_shape, new_stride) = compute_permuted_parameters(
+            view.meta.shape(),
+            view.meta.strides(),
+            &dims.into()
+        )?;
+
+        view.meta.shape = new_shape;
+        view.meta.strides = new_stride;
+
+        Ok(view)
+    }
+
 }
 
 /// Converts a logical index (coordinate, single position, or scalar) into a
@@ -241,7 +273,7 @@ where V: AsViewMut<T, B>
 /// Errors
 /// - `WrongDims` if index rank differs from stride length, or `Item` is used on non-scalars.
 /// - `IdxOutOfBounds` is not checked here (caller validates against buffer length).
-fn logical_to_buffer_idx(idx: &Idx, stride: &Stride, offset: usize) -> Result<usize, TensorError> {
+fn logical_to_buffer_idx(idx: &Idx, stride: &Strides, offset: usize) -> Result<usize, TensorError> {
     match idx {
         Idx::Coord(idx) => {
             if idx.len() != stride.len() {
@@ -269,4 +301,30 @@ fn logical_to_buffer_idx(idx: &Idx, stride: &Stride, offset: usize) -> Result<us
             logical_to_buffer_idx(&Idx::Coord(vec![*i]), stride, offset)
         }
     }
+}
+
+fn compute_permuted_parameters(shape: &Shape, stride: &Strides, dims: &Idx) -> Result<(Shape, Strides), TensorError> {
+    let rank = shape.len();
+    let dims_vec = match dims {
+        Idx::Coord(v) => v.clone(),
+        Idx::At(i) => vec![*i],
+        Idx::Item => vec![],
+    };
+
+    if dims_vec.len() != rank {
+        return Err(TensorError::WrongDims);
+    }
+
+    let mut new_shape = Vec::with_capacity(rank);
+    let mut new_stride = Vec::with_capacity(rank);
+
+    for &d in &dims_vec {
+        if d >= rank {
+            return Err(TensorError::InvalidDim);
+        }
+        new_shape.push(shape[d]);
+        new_stride.push(stride[d]);
+    }
+
+    Ok((new_shape.into(), new_stride))
 }
