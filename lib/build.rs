@@ -1,5 +1,4 @@
 
-#[cfg(feature = "cuda")]
 use std::path::PathBuf;
 
 fn main() {
@@ -7,13 +6,140 @@ fn main() {
     {
         build_cuda_kernels();
     }
-    
+    setup_openblas();
     println!("cargo:rerun-if-changed=build.rs");
+}
+
+fn setup_openblas() {
+    use std::env;
+    use std::fs;
+    use std::path::PathBuf;
+    use std::process::Command;
+    
+    let target = env::var("TARGET").unwrap();
+    
+    // Only support linux x86_64 for now
+    if target != "x86_64-unknown-linux-gnu" {
+        panic!("OpenBLAS is currently only supported for x86_64-unknown-linux-gnu target. Found: {}", target);
+    }
+    
+    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+    let openblas_dir = out_dir.join("openblas");
+    let openblas_lib_dir = openblas_dir.join("lib");
+    let openblas_include_dir = openblas_dir.join("include");
+    
+    // Check if OpenBLAS is already downloaded and extracted
+    if openblas_lib_dir.exists() && openblas_include_dir.exists() {
+        println!("OpenBLAS already set up at: {}", openblas_dir.display());
+    } else {
+        println!("Downloading OpenBLAS for linux x86_64...");
+        
+        let download_url = "https://github.com/aheschl1/tensors/releases/download/openblas/openblas-linux-x86_64.tar.gz";
+        let tarball_path = out_dir.join("openblas-linux-x86_64.tar.gz");
+        
+        // Download the tarball
+        let curl_status = Command::new("curl")
+            .arg("-L")
+            .arg("-o")
+            .arg(&tarball_path)
+            .arg(download_url)
+            .status()
+            .expect("Failed to run curl. Please install curl.");
+        
+        assert!(
+            curl_status.success(),
+            "Failed to download OpenBLAS from {}", 
+            download_url
+        );
+        
+        println!("Downloaded OpenBLAS to: {}", tarball_path.display());
+        
+        // Create the openblas directory if it doesn't exist
+        fs::create_dir_all(&openblas_dir)
+            .expect("Failed to create OpenBLAS directory");
+        
+        // Extract the tarball
+        let tar_status = Command::new("tar")
+            .arg("-xzf")
+            .arg(&tarball_path)
+            .arg("-C")
+            .arg(&openblas_dir)
+            .arg("--strip-components=1")
+            .status()
+            .expect("Failed to run tar. Please install tar.");
+        
+        assert!(
+            tar_status.success(),
+            "Failed to extract OpenBLAS tarball"
+        );
+        
+        println!("Extracted OpenBLAS to: {}", openblas_dir.display());
+        
+        // Clean up the tarball
+        fs::remove_file(&tarball_path)
+            .ok();
+    }
+    
+    // Tell cargo where to find the OpenBLAS library
+    println!("cargo:rustc-link-search=native={}", openblas_lib_dir.display());
+    println!("cargo:rustc-link-lib=static=openblas");
+    
+    // Also need to link against libgfortran for OpenBLAS
+    println!("cargo:rustc-link-lib=dylib=gfortran");
+    println!("cargo:rustc-link-lib=dylib=m");
+    println!("cargo:rustc-link-lib=dylib=pthread");
+    
+    // Tell cargo to rerun if OpenBLAS directory changes
+    println!("cargo:rerun-if-changed={}", openblas_dir.display());
+    
+    // Generate bindings for OpenBLAS headers
+    generate_openblas_bindings(&openblas_include_dir, &out_dir);
+}
+
+fn generate_openblas_bindings(include_dir: &std::path::PathBuf, out_dir: &std::path::PathBuf) {
+    let cblas_header = include_dir.join("cblas.h");
+    
+    println!("Generating OpenBLAS bindings from: {}", cblas_header.display());
+    
+    // Generate bindings for cblas.h (which is the main C interface)
+    let bindings = bindgen::Builder::default()
+        .header(cblas_header.to_str().unwrap())
+        .clang_arg(format!("-I{}", include_dir.display()))
+        // Parse cblas.h and include related headers
+        .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
+        // Allowlist the functions and types we want
+        .allowlist_function("openblas_.*")
+        .allowlist_function("goto_.*")
+        .allowlist_function("cblas_.*")
+        .allowlist_type("CBLAS_.*")
+        .allowlist_type("blasint")
+        .allowlist_var("OPENBLAS_.*")
+        // Generate types as simple as possible
+        .default_enum_style(bindgen::EnumVariation::Rust {
+            non_exhaustive: false,
+        })
+        .derive_debug(true)
+        .derive_default(true)
+        .derive_copy(true)
+        .derive_eq(true)
+        .derive_partialeq(true)
+        // Use core instead of std for better portability
+        .use_core()
+        // Finish the builder and generate the bindings
+        .generate()
+        .expect("Unable to generate OpenBLAS bindings");
+
+    // Write the bindings to the $OUT_DIR/openblas_bindings.rs file
+    let out_path = PathBuf::from(out_dir);
+    bindings
+        .write_to_file(out_path.join("openblas_bindings.rs"))
+        .expect("Couldn't write OpenBLAS bindings!");
+    
+    println!("Generated OpenBLAS bindings at: {}", out_path.join("openblas_bindings.rs").display());
 }
 
 #[cfg(feature = "cuda")]
 fn find_nvcc() -> Option<PathBuf> {
-    use std::path::PathBuf;
     use std::process::Command;
     
     // Try to find nvcc in PATH first
@@ -47,8 +173,6 @@ fn find_nvcc() -> Option<PathBuf> {
 
 #[cfg(feature = "cuda")]
 fn find_cuda_lib_path() -> Option<PathBuf> {
-    use std::path::PathBuf;
-    
     // Common CUDA library paths
     let common_paths = [
         "/usr/local/cuda/lib64",
@@ -73,7 +197,6 @@ fn find_cuda_lib_path() -> Option<PathBuf> {
 
 #[cfg(feature = "cuda")]
 fn find_cuda_kernel_files() -> Vec<PathBuf> {
-    use std::path::PathBuf;
     use std::fs;
     
     let kernels_dir = PathBuf::from("src/cuda/kernels");

@@ -46,10 +46,33 @@ pub trait Backend<T: TensorValue> {
         stride: &[isize],
     ) -> Result<(), TensorError>;
 
+
+    /// Matrix multiplication of two tensors
+    /// 
+    /// # Parameters
+    /// - `lhs_buf`: Buffer of the left-hand side tensor
+    /// - `rhs_buf`: Buffer of the right-hand side tensor
+    /// - `lhs_offset`: Offset into the left-hand side buffer
+    /// - `rhs_offset`: Offset into the right-hand side buffer
+    /// - `b`: Batch size
+    /// - `m`: Number of rows in the left-hand side matrix
+    /// - `k`: Number of columns in the left-hand side matrix (and rows in
+    /// 
+    /// # Requirements
+    /// - The left-hand side tensor must have shape `[b, m, k]`
+    /// - The right-hand side tensor must have shape `[b, k, n]`
+    /// - The output tensor will have shape `[b, m, n]`
+    /// - contiguous C-order layout with offset 0
     fn matmul(
         &self,
-        lhs: (MetaTensor, &Self::Buf), 
-        rhs: (MetaTensor, &Self::Buf)
+        lhs_buf: &Self::Buf,
+        rhs_buf: &Self::Buf,
+        lhs_offset: usize,
+        rhs_offset: usize,
+        b: usize,
+        m: usize,
+        k: usize,
+        n: usize,
     ) -> Result<Self::Buf, TensorError>;
 
     /// Broadcast two tensors into a destination tensor according to broadcasting rules
