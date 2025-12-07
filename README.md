@@ -1,45 +1,31 @@
 # tensors and such
 
-Tensor primitives with arbitrary view, shape, stride. Cuda and CPU backends
+Tensor primitives with Cuda and CPU backends.
+Uses BLAS, cuBLAS, and custom kernels.
 
 Goal is high performance ML stack with minimal dependencies and maximal flexibility
 
 ## todo
 
-- [X] Backend abstraction
-- [X] Nicer syntax. macro time `set!(tensor, v: 99, 1, 2)` and `get!(tensor, 1, 2)` and `coord![1, 2, ..]`
-- [X] Basic GPU backend
-- [X] Slicing with ranges `tensor.view().slice(0, 1..3)` etc.
-- [X] Test more slicing syntaxes
 - [ ] Slicing macro
-- [X] Elementwise broadcasting
-- [X] Basic linear algebra helpers
-- [X] Accelerated backends (GPU / parallel) in progress
 - [ ] x86 SIMD paths (currently relying on llvm auto-vectorization for CPU which only works for contiguous memory)
 - [ ] Multiple gpu devices allowed
-- [X] Do not lock thread on GPU dispatch
 - [ ] strides and offset as bytes  
-- [X] Broadcasting
-- [X] Idx should not be ref. makes it less ergonomic
 - [ ] Pull out ops into crate defined traits, which return Result, and call that from Add and AddAssign impls (panic there)
 - [ ] Figure outt bool types, and in general those without Add, Sub, and Mul impls
 - [ ] Allow step_by for slicing iterator
 - [X] OpenBlas for more targets, investigate build system
-- [X] cuBLAS
+- [ ] unsqueeze check bounds and add failure tests (unsqueeze_at(100000000) 4 example)
 
 ## to optimize
 
 - [ ] collapse dims to allow backend to access contiguous fast paths
 - [ ] `view_to_owned` can probably be optimized to copy larger chunks at once
-- [X] Restrict tensor values to require basic operations
-- [X] perf sucks for contiguous memory in unary CPU - fix
-- [X] perf sucks for contiguous memory in unary CUDA - fix
-- [X] perf sucks for non-contiguous memory in unary CPU - fix
-- [X] perf sucks for non-contiguous memory in unary CUDA - fix
 - [ ] O(rank * size) instead of O(size) broadcasting ops is bad
 - [ ] Broadcast cuda kernel puts a cap on tensor dim size - fix
 - [ ] Allow F contiguous for matmul, as well as C.
 - [ ] Matmul not using openblas for other than T=f32/f64
+- [ ] when does a tensor need to be materialized before matmul
 
 ## Some examples
 
@@ -113,7 +99,8 @@ tensor.slice(0, 5..2)           // Elements 5, 4, 3 (auto step=-1)
 tensor.slice(0, 9..=0)          // Elements 9, 8, 7, ..., 1, 0 (auto step=-1)
 
 // Explicit negative step using Slice builder
-tensor.slice(0, Slice::from(..).step(-1))     // Reverse entire dimension
+tensor.slice(0, Slice::full().step(-1))       // Reverse entire dimension 
+tensor.slice(0, Slice::from(..).step(-1))     // Reverse entire dimension (alternative)
 tensor.slice(0, Slice::from(8..).step(-1))    // From index 8 to start, reversed
 tensor.slice(0, Slice::from(..5).step(-1))    // last element to index 5, reversed
 
@@ -217,6 +204,11 @@ a += b ;  // b broadcasts along rows of a
 // Permutation example
 let tensor = Tensor::<i32>::ones((1, 2, 3)); // Shape: (1, 2, 3)
 let permuted = tensor.permute(vec![2, 0, 1]).unwrap(); // Shape: (3, 1, 2)
+
+// unsqueeze
+let tensor = Tensor::<f32>::ones((3, 4)); // Shape: (3, 4)
+let unsqueezed = tensor.unsqueeze().unwrap(); // Shape: (1, 3, 4)
+let unsqueezed2 = tensor.unsqueeze_at(2).unwrap(); // Shape: (3, 4, 1)
 ```
 
 ```rust

@@ -29,11 +29,9 @@ where
             unsafe {_rhs_storage.as_ref().unwrap_unchecked().view()}
         };
 
-        // Extract meta
         let lhs = &lhs_view.meta;
         let rhs = &rhs_view.meta;
 
-        // -------- Shape validation --------
         let lr = lhs.rank();
         let rr = rhs.rank();
 
@@ -45,12 +43,10 @@ where
         let lhs_batch_dims: Vec<usize> = lhs.shape.0[..lr - 2].to_vec();
         let rhs_batch_dims: Vec<usize> = rhs.shape.0[..rr - 2].to_vec();
 
-        // strict batch match, no broadcasting
         if lhs_batch_dims != rhs_batch_dims {
             return Err(TensorError::SizeMismatch);
         }
 
-        // total batch size = product of leading dims (or 1 if none)
         let b = if lhs_batch_dims.is_empty() {
             1
         } else {
@@ -74,7 +70,6 @@ where
         let out_shape: Shape = out_shape_vec.into();
         let out_strides = shape_to_stride(&out_shape);
 
-        // -------- Call backend matmul --------
         let buf = lhs_view.backend.matmul(
             lhs_view.buf,
             rhs_view.buf,

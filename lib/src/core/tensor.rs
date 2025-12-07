@@ -206,7 +206,10 @@ pub trait TensorAccess<T: TensorValue, B: Backend<T>>: Sized {
 
     fn permute(&self, dims: impl Into<Idx>) -> Result<TensorView<'_, T, B>, TensorError>;
     fn transpose(&self) -> Result<TensorView<'_, T, B>, TensorError>;
-    fn unsqueeze(&self) -> Result<TensorView<'_, T, B>, TensorError>;
+    fn unsqueeze_at(&self, dim: Dim) -> Result<TensorView<'_, T, B>, TensorError>;
+    fn unsqueeze(&self) -> Result<TensorView<'_, T, B>, TensorError> {
+        self.unsqueeze_at(0)
+    }
 }
 
 pub trait TensorAccessMut<T: TensorValue, B: Backend<T>>: TensorAccess<T, B> {
@@ -221,7 +224,10 @@ pub trait TensorAccessMut<T: TensorValue, B: Backend<T>>: TensorAccess<T, B> {
 
     fn permute_mut(&mut self, dims: impl Into<Idx>) -> Result<TensorViewMut<'_, T, B>, TensorError> ;
     fn transpose_mut(&mut self) -> Result<TensorViewMut<'_, T, B>, TensorError>;
-    fn unsqueeze_mut(&mut self) -> Result<TensorViewMut<'_, T, B>, TensorError>;
+    fn unsqueeze_at_mut(&mut self, dim: Dim) -> Result<TensorViewMut<'_, T, B>, TensorError>;
+    fn unsqueeze_mut(&mut self) -> Result<TensorViewMut<'_, T, B>, TensorError> {
+        self.unsqueeze_at_mut(0)
+    }
 }
 
 impl<T: TensorValue, B: Backend<T>, V> TensorAccess<T, B> for V
@@ -279,12 +285,13 @@ where B: Backend<T>, V: AsView<T, B>
         let dims: Idx = Idx::Coord((0..rank).rev().collect());
         self.permute(dims)
     }
-    
-    fn unsqueeze(&self) -> Result<TensorView<'_, T, B>, TensorError> {
+
+    fn unsqueeze_at(&self, dim: Dim) -> Result<TensorView<'_, T, B>, TensorError> {
         let view = self.view();
         let (new_shape, new_strides) = compute_unsqueezed_parameters(
             view.meta.shape(),
-            view.meta.strides()
+            view.meta.strides(),
+            dim
         );
 
         let res = TensorView::from_parts(
@@ -340,11 +347,12 @@ where V: AsViewMut<T, B>
         self.permute_mut(dims)
     }
 
-    fn unsqueeze_mut(&mut self) -> Result<TensorViewMut<'_, T, B>, TensorError> {
+    fn unsqueeze_at_mut(&mut self, dim: Dim) -> Result<TensorViewMut<'_, T, B>, TensorError> {
         let view = self.view_mut();
         let (new_shape, new_strides) = compute_unsqueezed_parameters(
             view.meta.shape(),
-            view.meta.strides()
+            view.meta.strides(),
+            dim
         );
 
         let res = TensorViewMut::from_parts(
@@ -368,6 +376,7 @@ where V: AsViewMut<T, B>
 /// Errors
 /// - `WrongDims` if index rank differs from stride length, or `Item` is used on non-scalars.
 /// - `IdxOutOfBounds` is not checked here (caller validates against buffer length).
+#[inline]
 fn logical_to_buffer_idx(idx: &Idx, stride: &Strides, offset: usize) -> Result<usize, TensorError> {
     match idx {
         Idx::Coord(idx) => {
@@ -398,6 +407,7 @@ fn logical_to_buffer_idx(idx: &Idx, stride: &Strides, offset: usize) -> Result<u
     }
 }
 
+#[inline]
 fn compute_permuted_parameters(shape: &Shape, stride: &Strides, dims: &Idx) -> Result<(Shape, Strides), TensorError> {
     let rank = shape.len();
     let dims_vec = match dims {
@@ -425,14 +435,14 @@ fn compute_permuted_parameters(shape: &Shape, stride: &Strides, dims: &Idx) -> R
 }
 
 #[inline]
-fn compute_unsqueezed_parameters(shape: &Shape, stride: &Strides) -> (Shape, Strides) {
+fn compute_unsqueezed_parameters(shape: &Shape, stride: &Strides, dim: Dim) -> (Shape, Strides) {
     let mut new_strides = stride.clone();
     let mut new_shape = shape.clone();
 
-    let lstr = *new_strides.0.first().unwrap_or(&1);
-    let lsh = *new_shape.0.first().unwrap_or(&1) as isize;
-    new_strides.0.insert(0, lstr * lsh);
-    new_shape.0.insert(0, 1);
+    let lstr = *new_strides.0.get(dim).unwrap_or(&1);
+    let lsh = *new_shape.0.get(dim).unwrap_or(&1) as isize;
+    new_strides.0.insert(dim, lstr * lsh);
+    new_shape.0.insert(dim, 1);
 
     (new_shape, new_strides)
 }
