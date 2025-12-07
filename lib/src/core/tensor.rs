@@ -429,8 +429,8 @@ fn compute_unsqueezed_parameters(shape: &Shape, stride: &Strides) -> (Shape, Str
     let mut new_strides = stride.clone();
     let mut new_shape = shape.clone();
 
-    let lstr = *new_strides.0.get(0).unwrap_or(&1);
-    let lsh = *new_shape.0.get(0).unwrap_or(&1) as isize;
+    let lstr = *new_strides.0.first().unwrap_or(&1);
+    let lsh = *new_shape.0.first().unwrap_or(&1) as isize;
     new_strides.0.insert(0, lstr * lsh);
     new_shape.0.insert(0, 1);
 
