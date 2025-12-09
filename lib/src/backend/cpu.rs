@@ -8,7 +8,9 @@ impl<T: TensorValue> Backend<T> for Cpu {
     type Buf = Box<[T]>;
 
 
-
+    fn device_type() -> crate::core::primitives::DeviceType {
+        crate::core::primitives::DeviceType::Cpu
+    }
     fn alloc(&self, len: usize) -> Result<Box<[T]>, TensorError> {
         Ok(vec![T::default(); len].into())
     }

@@ -920,7 +920,7 @@ mod tests {
         // make sure that the stride and all is expected
         assert_eq!(*slice.shape(), vec![2, 4]);
         assert!(!slice.is_contiguous(), "Slice should be non-contiguous");
-        assert_eq!(*slice.stride(), vec![12, 1]); // Original strides were [12,4,1]
+        assert_eq!(*slice.strides(), vec![12, 1]); // Original strides were [12,4,1]
         assert_eq!(slice.offset(), 4); // Starting at index 4 in flat array
 
         slice += 100;
