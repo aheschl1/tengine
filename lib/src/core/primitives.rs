@@ -245,3 +245,10 @@ where
         Self::from_buf(min_buf, shape).expect("Failed to allocate memory")
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeviceType {
+    Cpu,
+    #[cfg(feature = "cuda")]
+    Cuda(usize),
+}

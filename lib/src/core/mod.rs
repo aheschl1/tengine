@@ -31,7 +31,7 @@ mod tests {
         let view = tensor.view();
         let slice = view.slice(0, 0..0).unwrap(); // slice along rows, should give a view of shape [3]
         assert_eq!(*slice.shape(), vec![3]);
-        assert_eq!(*slice.stride(), vec![1]);
+        assert_eq!(*slice.strides(), vec![1]);
         assert_eq!(index_tensor(Idx::At(0), &slice).unwrap(), 1);
         assert_eq!(index_tensor(Idx::At(1), &slice).unwrap(), 2);
         assert_eq!(index_tensor(Idx::At(2), &slice).unwrap(), 3);
@@ -39,7 +39,7 @@ mod tests {
         let view = tensor.view();
         let slice2 = view.slice(1, 0..0).unwrap(); // slice along columns, should give a view of shape [2]
         assert_eq!(*slice2.shape(), vec![2]);
-        assert_eq!(*slice2.stride(), vec![3]);
+        assert_eq!(*slice2.strides(), vec![3]);
         assert_eq!(index_tensor(Idx::At(0), &slice2).unwrap(), 1);
         assert_eq!(index_tensor(coord![1], &slice2).unwrap(), 4);
         assert_eq!(index_tensor(Idx::At(1), &slice2).unwrap(), 4);
@@ -54,7 +54,7 @@ mod tests {
         let view = tensor.view();
         let slice = view.slice(0, 0..0).unwrap(); // slice along depth, should give a view of shape [2, 2]
         assert_eq!(*slice.shape(), vec![2, 2]);
-        assert_eq!(*slice.stride(), vec![2, 1]);
+        assert_eq!(*slice.strides(), vec![2, 1]);
         assert_eq!(index_tensor(coord![0, 0], &slice).unwrap(), 1);
         assert_eq!(index_tensor(Idx::Coord(vec![0, 1]), &slice).unwrap(), 2);
         assert_eq!(index_tensor(Idx::Coord(vec![1, 0]), &slice).unwrap(), 4);
@@ -64,7 +64,7 @@ mod tests {
         let view = tensor.view();
         let slice_second_depth = view.slice(0, 1..1).unwrap();
         assert_eq!(*slice_second_depth.shape(), vec![2, 2]);
-        assert_eq!(*slice_second_depth.stride(), vec![2, 1]);
+        assert_eq!(*slice_second_depth.strides(), vec![2, 1]);
         assert_eq!(index_tensor(Idx::Coord(vec![0, 0]), &slice_second_depth).unwrap(), 6);
         assert_eq!(index_tensor(Idx::Coord(vec![0, 1]), &slice_second_depth).unwrap(), 7);
         assert_eq!(index_tensor(Idx::Coord(vec![1, 0]), &slice_second_depth).unwrap(), 8);
@@ -73,7 +73,7 @@ mod tests {
         let view = tensor.view();
         let slice2 = view.slice(1, 0..0).unwrap(); // slice along row, should give a view of shape [2, 2]
         assert_eq!(*slice2.shape(), vec![2, 2]);
-        assert_eq!(*slice2.stride(), vec![4, 1]);
+        assert_eq!(*slice2.strides(), vec![4, 1]);
         assert_eq!(index_tensor(coord![0, 0], &slice2).unwrap(), 1);
         assert_eq!(index_tensor(Idx::Coord(vec![0, 1]), &slice2).unwrap(), 2);
         assert_eq!(index_tensor(Idx::Coord(vec![1, 0]), &slice2).unwrap(), 6);
@@ -83,7 +83,7 @@ mod tests {
         let view = tensor.view();
         let slice3 = view.slice(2, 0..0).unwrap(); // slice along column
         assert_eq!(*slice3.shape(), vec![2, 2]);
-        assert_eq!(*slice3.stride(), vec![4, 2]);
+        assert_eq!(*slice3.strides(), vec![4, 2]);
         assert_eq!(index_tensor(Idx::Coord(vec![0, 0]), &slice3).unwrap(), 1);
         assert_eq!(index_tensor(Idx::Coord(vec![0, 1]), &slice3).unwrap(), 4);
         assert_eq!(index_tensor(Idx::Coord(vec![1, 0]), &slice3).unwrap(), 6);
@@ -124,7 +124,7 @@ mod tests {
         let view = tensor.view();
         let slice = view.slice(0, 1..3).unwrap();
         assert_eq!(*slice.shape(), vec![2, 3]); // 2 rows, 3 columns
-        assert_eq!(*slice.stride(), vec![3, 1]);
+        assert_eq!(*slice.strides(), vec![3, 1]);
         
         // Should contain rows 1 and 2 (4,5,6 and 7,8,9)
         assert_eq!(index_tensor(Idx::Coord(vec![0, 0]), &slice).unwrap(), 4);
@@ -150,7 +150,7 @@ mod tests {
         let view = tensor.view();
         let slice = view.slice(1, 1..3).unwrap();
         assert_eq!(*slice.shape(), vec![3, 2]); // 3 rows, 2 columns
-        assert_eq!(*slice.stride(), vec![4, 1]);
+        assert_eq!(*slice.strides(), vec![4, 1]);
         
         // Should contain columns 1 and 2 from each row
         assert_eq!(index_tensor(Idx::Coord(vec![0, 0]), &slice).unwrap(), 2);
@@ -185,7 +185,7 @@ mod tests {
         let view = tensor.view();
         let slice = view.slice(0, 1..3).unwrap();
         assert_eq!(*slice.shape(), vec![2, 2, 2]); // 2 depth, 2 rows, 2 columns
-        assert_eq!(*slice.stride(), vec![4, 2, 1]);
+        assert_eq!(*slice.strides(), vec![4, 2, 1]);
         
         // Should contain depth slices 1 and 2
         assert_eq!(index_tensor(Idx::Coord(vec![0, 0, 0]), &slice).unwrap(), 5);
@@ -208,7 +208,7 @@ mod tests {
         let view = tensor.view();
         let slice = view.slice(0, 0..5).unwrap(); // First 5 elements
         assert_eq!(*slice.shape(), vec![5]);
-        assert_eq!(*slice.stride(), vec![1]);
+        assert_eq!(*slice.strides(), vec![1]);
         assert_eq!(index_tensor(Idx::At(0), &slice).unwrap(), 1);
         assert_eq!(index_tensor(Idx::At(1), &slice).unwrap(), 2);
         assert_eq!(index_tensor(Idx::At(4), &slice).unwrap(), 5);
@@ -224,7 +224,7 @@ mod tests {
         let view = tensor.view();
         let slice = view.slice(0, 5..8).unwrap(); // Last 3 elements
         assert_eq!(*slice.shape(), vec![3]);
-        assert_eq!(*slice.stride(), vec![1]);
+        assert_eq!(*slice.strides(), vec![1]);
         assert_eq!(index_tensor(Idx::At(0), &slice).unwrap(), 6);
         assert_eq!(index_tensor(Idx::At(1), &slice).unwrap(), 7);
         assert_eq!(index_tensor(Idx::At(2), &slice).unwrap(), 8);
@@ -281,7 +281,7 @@ mod tests {
         let view = tensor.view();
         let slice = view.slice(0, 0..2).unwrap(); // All rows
         assert_eq!(*slice.shape(), vec![2, 3]);
-        assert_eq!(*slice.stride(), vec![3, 1]);
+        assert_eq!(*slice.strides(), vec![3, 1]);
         
         // Should contain all original data
         assert_eq!(index_tensor(Idx::Coord(vec![0, 0]), &slice).unwrap(), 1);
@@ -298,7 +298,7 @@ mod tests {
         let view = tensor.view();
         let slice = view.slice(0, 2..3).unwrap(); // Single element at index 2
         assert_eq!(*slice.shape(), vec![1]); // Dimension remains, but size is 1
-        assert_eq!(*slice.stride(), vec![1]);
+        assert_eq!(*slice.strides(), vec![1]);
         assert_eq!(index_tensor(Idx::At(0), &slice).unwrap(), 3);
     }
 
@@ -1383,15 +1383,15 @@ mod tests {
     #[test]
     fn test_dims_equals_stride_len() {
         let owned = make_tensor(vec![1,2,3,4,5,6], vec![2,3]);
-        assert_eq!(owned.dims(), owned.stride().len());
+        assert_eq!(owned.dims(), owned.strides().len());
 
         let v5 = owned.view();
         let row = v5.slice(0, 1..1).unwrap();
-        assert_eq!(row.dims(), row.stride().len());
+        assert_eq!(row.dims(), row.strides().len());
 
         let v6 = owned.view();
         let col_like = v6.slice(1, 0..0).unwrap();
-        assert_eq!(col_like.dims(), col_like.stride().len());
+        assert_eq!(col_like.dims(), col_like.strides().len());
     }
 
     #[test]
@@ -1977,7 +1977,7 @@ mod tests {
         let view = tensor.view();
         let transposed = view.transpose().unwrap();
         assert_eq!(*transposed.shape(), vec![3, 2]); // 3 rows, 2 columns
-        assert_eq!(*transposed.stride(), vec![1, 3]); // stride is swapped
+        assert_eq!(*transposed.strides(), vec![1, 3]); // stride is swapped
         
         // Check values are correctly transposed
         assert_eq!(index_tensor(coord![0, 0], &transposed).unwrap(), 1);
@@ -2003,7 +2003,7 @@ mod tests {
         
         let transposed = tensor.transpose().unwrap();
         assert_eq!(*transposed.shape(), vec![2, 2, 2]); // dimensions reversed
-        assert_eq!(*transposed.stride(), vec![1, 2, 4]); // strides reversed
+        assert_eq!(*transposed.strides(), vec![1, 2, 4]); // strides reversed
         
         // Original [0,0,0] -> 1, Transposed [0,0,0] -> 1
         assert_eq!(index_tensor(coord![0, 0, 0], &transposed).unwrap(), 1);
@@ -2076,7 +2076,7 @@ mod tests {
         
         let permuted = tensor.permute(vec![1, 0]).unwrap();
         assert_eq!(*permuted.shape(), vec![3, 2]);
-        assert_eq!(*permuted.stride(), vec![1, 3]);
+        assert_eq!(*permuted.strides(), vec![1, 3]);
         
         // Should match transpose
         assert_eq!(index_tensor(coord![0, 0], &permuted).unwrap(), 1);
@@ -2103,7 +2103,7 @@ mod tests {
         
         // Original strides: [6, 3, 1]
         // Permuted strides: [1, 6, 3]
-        assert_eq!(*permuted.stride(), vec![1, 6, 3]);
+        assert_eq!(*permuted.strides(), vec![1, 6, 3]);
         
         // Original [0,0,0] -> 1, Permuted [0,0,0] -> 1
         assert_eq!(index_tensor(coord![0, 0, 0], &permuted).unwrap(), 1);
@@ -2125,7 +2125,7 @@ mod tests {
         // Permute: [0,1,2] -> [1,0,2] (swap first two dims)
         let permuted = tensor.permute(vec![1, 0, 2]).unwrap();
         assert_eq!(*permuted.shape(), vec![2, 2, 2]);
-        assert_eq!(*permuted.stride(), vec![2, 4, 1]);
+        assert_eq!(*permuted.strides(), vec![2, 4, 1]);
         
         // Original [0,0,0] -> 1, Permuted [0,0,0] -> 1
         assert_eq!(index_tensor(coord![0, 0, 0], &permuted).unwrap(), 1);
@@ -2172,7 +2172,7 @@ mod tests {
         
         let permuted = tensor.permute(vec![0, 1]).unwrap();
         assert_eq!(*permuted.shape(), vec![2, 3]);
-        assert_eq!(*permuted.stride(), vec![3, 1]);
+        assert_eq!(*permuted.strides(), vec![3, 1]);
         
         // All values should be the same
         assert_eq!(index_tensor(coord![0, 0], &permuted).unwrap(), 1);
@@ -2189,7 +2189,7 @@ mod tests {
         // Permute: [0,1,2,3] -> [3,2,1,0] (reverse all)
         let permuted = tensor.permute(vec![3, 2, 1, 0]).unwrap();
         assert_eq!(*permuted.shape(), vec![2, 2, 2, 2]);
-        assert_eq!(*permuted.stride(), vec![1, 2, 4, 8]);
+        assert_eq!(*permuted.strides(), vec![1, 2, 4, 8]);
         
         // Original [0,0,0,0] -> 1, Permuted [0,0,0,0] -> 1
         assert_eq!(index_tensor(coord![0, 0, 0, 0], &permuted).unwrap(), 1);
@@ -2412,7 +2412,7 @@ mod tests {
         
         // Should have shape [1] after unsqueezing
         assert_eq!(*unsqueezed.shape(), vec![1]);
-        assert_eq!(*unsqueezed.stride(), vec![1]);
+        assert_eq!(*unsqueezed.strides(), vec![1]);
         assert_eq!(index_tensor(Idx::At(0), &unsqueezed).unwrap(), 42);
     }
 
@@ -2428,7 +2428,7 @@ mod tests {
         
         // Should have shape [1, 5] after unsqueezing
         assert_eq!(*unsqueezed.shape(), vec![1, 5]);
-        assert_eq!(*unsqueezed.stride(), vec![5, 1]);
+        assert_eq!(*unsqueezed.strides(), vec![5, 1]);
         
         // Verify data access
         assert_eq!(index_tensor(coord![0, 0], &unsqueezed).unwrap(), 1);
@@ -2450,7 +2450,7 @@ mod tests {
         
         // Should have shape [1, 2, 3] after unsqueezing
         assert_eq!(*unsqueezed.shape(), vec![1, 2, 3]);
-        assert_eq!(*unsqueezed.stride(), vec![6, 3, 1]);
+        assert_eq!(*unsqueezed.strides(), vec![6, 3, 1]);
         
         // Verify data access
         assert_eq!(index_tensor(coord![0, 0, 0], &unsqueezed).unwrap(), 1);
@@ -2474,7 +2474,7 @@ mod tests {
         
         let unsqueezed_twice = unsqueezed_once.unsqueeze().unwrap();
         assert_eq!(*unsqueezed_twice.shape(), vec![1, 1, 3]);
-        assert_eq!(*unsqueezed_twice.stride(), vec![3, 3, 1]);
+        assert_eq!(*unsqueezed_twice.strides(), vec![3, 3, 1]);
         
         // Verify data access
         assert_eq!(index_tensor(coord![0, 0, 0], &unsqueezed_twice).unwrap(), 1);
@@ -2497,7 +2497,7 @@ mod tests {
         // Now unsqueeze the slice
         let unsqueezed = sliced.unsqueeze().unwrap();
         assert_eq!(*unsqueezed.shape(), vec![1, 3]);
-        assert_eq!(*unsqueezed.stride(), vec![3, 1]);
+        assert_eq!(*unsqueezed.strides(), vec![3, 1]);
         
         // Verify data access
         assert_eq!(index_tensor(coord![0, 0], &unsqueezed).unwrap(), 1);
@@ -2516,12 +2516,12 @@ mod tests {
         let view = tensor.view();
         let sliced = view.slice(1, 0..0).unwrap();
         assert_eq!(*sliced.shape(), vec![2]);
-        assert_eq!(*sliced.stride(), vec![3]);  // Non-unit stride
+        assert_eq!(*sliced.strides(), vec![3]);  // Non-unit stride
         
         // Now unsqueeze the slice
         let unsqueezed = sliced.unsqueeze().unwrap();
         assert_eq!(*unsqueezed.shape(), vec![1, 2]);
-        assert_eq!(*unsqueezed.stride(), vec![6, 3]);  // Stride should be computed correctly
+        assert_eq!(*unsqueezed.strides(), vec![6, 3]);  // Stride should be computed correctly
         
         // Verify data access
         assert_eq!(index_tensor(coord![0, 0], &unsqueezed).unwrap(), 1);
@@ -2541,7 +2541,7 @@ mod tests {
             
             // Should have shape [1, 2, 2]
             assert_eq!(*unsqueezed.shape(), vec![1, 2, 2]);
-            assert_eq!(*unsqueezed.stride(), vec![4, 2, 1]);
+            assert_eq!(*unsqueezed.strides(), vec![4, 2, 1]);
             
             // Verify we can read through the unsqueezed view
             assert_eq!(index_tensor(coord![0, 0, 0], &unsqueezed).unwrap(), 1);
@@ -2640,7 +2640,7 @@ mod tests {
         
         // Shape should be [1, 3, 4]
         assert_eq!(*unsqueezed.shape(), vec![1, 3, 4]);
-        assert_eq!(*unsqueezed.stride(), vec![12, 4, 1]);
+        assert_eq!(*unsqueezed.strides(), vec![12, 4, 1]);
         
         // Verify every single element is accessible with correct indexing
         // Original [0, 0] -> Unsqueezed [0, 0, 0]
@@ -2679,7 +2679,7 @@ mod tests {
         
         // Shape should be [1, 2, 3, 4]
         assert_eq!(*unsqueezed.shape(), vec![1, 2, 3, 4]);
-        assert_eq!(*unsqueezed.stride(), vec![24, 12, 4, 1]);
+        assert_eq!(*unsqueezed.strides(), vec![24, 12, 4, 1]);
         
         // Test a few key positions
         // Original [0, 0, 0] = 1 -> Unsqueezed [0, 0, 0, 0]
@@ -2711,7 +2711,7 @@ mod tests {
         
         // Shape should change from [2, 3] to [1, 2, 3]
         assert_eq!(*unsqueezed.shape(), vec![1, 2, 3]);
-        assert_eq!(*unsqueezed.stride(), vec![6, 3, 1]);
+        assert_eq!(*unsqueezed.strides(), vec![6, 3, 1]);
         
         // Test data is still accessible
         assert_eq!(index_tensor(coord![0, 0, 0], &unsqueezed).unwrap(), 1);
@@ -2729,7 +2729,7 @@ mod tests {
         
         // Shape should change from [2, 3] to [2, 1, 3]
         assert_eq!(*unsqueezed.shape(), vec![2, 1, 3]);
-        assert_eq!(*unsqueezed.stride(), vec![3, 3, 1]);
+        assert_eq!(*unsqueezed.strides(), vec![3, 3, 1]);
         
         // Test data is still accessible
         assert_eq!(index_tensor(coord![0, 0, 0], &unsqueezed).unwrap(), 1);
@@ -2747,7 +2747,7 @@ mod tests {
         
         // Shape should change from [2, 3] to [2, 3, 1]
         assert_eq!(*unsqueezed.shape(), vec![2, 3, 1]);
-        assert_eq!(*unsqueezed.stride(), vec![3, 1, 1]);
+        assert_eq!(*unsqueezed.strides(), vec![3, 1, 1]);
         
         // Test data is still accessible
         assert_eq!(index_tensor(coord![0, 0, 0], &unsqueezed).unwrap(), 1);
@@ -2764,12 +2764,12 @@ mod tests {
         // Unsqueeze at beginning
         let unsqueezed = tensor.unsqueeze_at(0).unwrap();
         assert_eq!(*unsqueezed.shape(), vec![1, 4]);
-        assert_eq!(*unsqueezed.stride(), vec![4, 1]);
+        assert_eq!(*unsqueezed.strides(), vec![4, 1]);
         
         // Unsqueeze at end
         let unsqueezed2 = tensor.unsqueeze_at(1).unwrap();
         assert_eq!(*unsqueezed2.shape(), vec![4, 1]);
-        assert_eq!(*unsqueezed2.stride(), vec![1, 1]);
+        assert_eq!(*unsqueezed2.strides(), vec![1, 1]);
     }
 
     #[test]
@@ -2783,22 +2783,22 @@ mod tests {
         // Unsqueeze at position 0: [2, 3, 4] -> [1, 2, 3, 4]
         let unsqueezed = tensor.unsqueeze_at(0).unwrap();
         assert_eq!(*unsqueezed.shape(), vec![1, 2, 3, 4]);
-        assert_eq!(*unsqueezed.stride(), vec![24, 12, 4, 1]);
+        assert_eq!(*unsqueezed.strides(), vec![24, 12, 4, 1]);
         
         // Unsqueeze at position 1: [2, 3, 4] -> [2, 1, 3, 4]
         let unsqueezed = tensor.unsqueeze_at(1).unwrap();
         assert_eq!(*unsqueezed.shape(), vec![2, 1, 3, 4]);
-        assert_eq!(*unsqueezed.stride(), vec![12, 12, 4, 1]);
+        assert_eq!(*unsqueezed.strides(), vec![12, 12, 4, 1]);
         
         // Unsqueeze at position 2: [2, 3, 4] -> [2, 3, 1, 4]
         let unsqueezed = tensor.unsqueeze_at(2).unwrap();
         assert_eq!(*unsqueezed.shape(), vec![2, 3, 1, 4]);
-        assert_eq!(*unsqueezed.stride(), vec![12, 4, 4, 1]);
+        assert_eq!(*unsqueezed.strides(), vec![12, 4, 4, 1]);
         
         // Unsqueeze at position 3: [2, 3, 4] -> [2, 3, 4, 1]
         let unsqueezed = tensor.unsqueeze_at(3).unwrap();
         assert_eq!(*unsqueezed.shape(), vec![2, 3, 4, 1]);
-        assert_eq!(*unsqueezed.stride(), vec![12, 4, 1, 1]);
+        assert_eq!(*unsqueezed.strides(), vec![12, 4, 1, 1]);
     }
 
     #[test]
@@ -3115,7 +3115,7 @@ mod tests {
         // Reverse the tensor: [8] with negative stride
         let reversed = tensor.slice(0, Slice::from(..).step(-1)).unwrap();
         assert_eq!(*reversed.shape(), vec![8]);
-        assert_eq!(*reversed.stride(), vec![-1]);
+        assert_eq!(*reversed.strides(), vec![-1]);
         
         // Verify reversed order
         assert_eq!(index_tensor(coord![0], &reversed).unwrap(), 8);
@@ -3124,7 +3124,7 @@ mod tests {
         // Unsqueeze the reversed tensor
         let unsqueezed = reversed.unsqueeze_at(0).unwrap();
         assert_eq!(*unsqueezed.shape(), vec![1, 8]);
-        assert_eq!(*unsqueezed.stride(), vec![-8, -1]);
+        assert_eq!(*unsqueezed.strides(), vec![-8, -1]);
         
         // Verify data is still in reversed order
         assert_eq!(index_tensor(coord![0, 0], &unsqueezed).unwrap(), 8);
@@ -3139,7 +3139,7 @@ mod tests {
         // Reverse rows: [3, 4] with negative stride on first dim
         let reversed = tensor.slice(0, Slice::from(..).step(-1)).unwrap();
         assert_eq!(*reversed.shape(), vec![3, 4]);
-        assert_eq!(*reversed.stride(), vec![-4, 1]);
+        assert_eq!(*reversed.strides(), vec![-4, 1]);
         
         // Verify: first row should be last row of original
         assert_eq!(index_tensor(coord![0, 0], &reversed).unwrap(), 9);
@@ -3148,7 +3148,7 @@ mod tests {
         // Unsqueeze in the middle
         let unsqueezed = reversed.unsqueeze_at(1).unwrap();
         assert_eq!(*unsqueezed.shape(), vec![3, 1, 4]);
-        assert_eq!(*unsqueezed.stride(), vec![-4, 4, 1]);
+        assert_eq!(*unsqueezed.strides(), vec![-4, 4, 1]);
         
         // Verify data integrity with negative stride
         assert_eq!(index_tensor(coord![0, 0, 0], &unsqueezed).unwrap(), 9);
@@ -3190,13 +3190,13 @@ mod tests {
         
         // Reverse the tensor
         let mut reversed = tensor.slice_mut(0, Slice::from(..).step(-1)).unwrap();
-        assert_eq!(*reversed.stride(), vec![-1]);
+        assert_eq!(*reversed.strides(), vec![-1]);
         assert_eq!(get!(reversed, 0).unwrap(), 6);
         
         // Unsqueeze it
         let mut unsqueezed = reversed.unsqueeze_at_mut(1).unwrap();
         assert_eq!(*unsqueezed.shape(), vec![6, 1]);
-        assert_eq!(*unsqueezed.stride(), vec![-1, 1]);
+        assert_eq!(*unsqueezed.strides(), vec![-1, 1]);
         
         // Modify: unsqueezed[0, 0] should be original[5] = 6
         unsqueezed.set(coord![0, 0], 100).unwrap();
@@ -3219,7 +3219,7 @@ mod tests {
         // Reverse both dimensions
         let mut reversed_rows = tensor.slice_mut(0, Slice::from(..).step(-1)).unwrap();
         let mut reversed_both = reversed_rows.slice_mut(1, Slice::from(..).step(-1)).unwrap();
-        assert_eq!(*reversed_both.stride(), vec![-4, -1]);
+        assert_eq!(*reversed_both.strides(), vec![-4, -1]);
         
         // Unsqueeze at position 1
         let mut unsqueezed = reversed_both.unsqueeze_at_mut(1).unwrap();
@@ -3336,13 +3336,13 @@ mod tests {
         // Slice with step: take every other column
         let sliced = tensor.slice(1, Slice::from(..).step(2)).unwrap();
         assert_eq!(*sliced.shape(), vec![5, 3]);
-        assert_eq!(*sliced.stride(), vec![6, 2]); // stride doubled for columns
+        assert_eq!(*sliced.strides(), vec![6, 2]); // stride doubled for columns
         
         // Unsqueeze at middle
         let unsqueezed = sliced.unsqueeze_at(1).unwrap();
         assert_eq!(*unsqueezed.shape(), vec![5, 1, 3]);
         // Stride should be [6, 6, 2] - middle stride inherits from outer dimension
-        assert_eq!(*unsqueezed.stride(), vec![6, 6, 2]);
+        assert_eq!(*unsqueezed.strides(), vec![6, 6, 2]);
         
         // Verify data access still works correctly
         // sliced[0, 0] = original[0, 0] = 1

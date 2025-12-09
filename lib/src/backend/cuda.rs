@@ -45,6 +45,7 @@ pub struct Cuda {
 
 
 impl Cuda {
+
     fn stream(&self) -> Arc<cudarc::driver::CudaStream> {
         self.ctx.default_stream()
     }
@@ -84,6 +85,10 @@ impl Cuda {
 impl<T: TensorValue> Backend<T> for Cuda {
     type Buf = CudaBuf<T>;
     
+    fn device_type() -> crate::core::primitives::DeviceType {
+        crate::core::primitives::DeviceType::Cuda(0)
+    }
+
     fn alloc_from_slice(&self, src: Box<[T]>) -> Result<Self::Buf, crate::core::tensor::TensorError> {
         let ptr = self.stream()
             .clone_htod(src.as_ref())

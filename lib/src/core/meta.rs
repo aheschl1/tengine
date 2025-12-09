@@ -171,6 +171,9 @@ impl MetaTensor {
     pub fn shape(&self) -> &Shape { &self.shape }
     /// Borrow the stride vector.
     pub fn strides(&self) -> &Strides { &self.strides }
+    pub fn byte_strides(&self, item_size: usize) -> Vec<isize> {
+        self.strides.iter().map(|s| s * item_size as isize).collect()
+    }
     /// Return the starting offset (in elements) into the underlying buffer.
     pub fn offset(&self) -> usize { self.offset }
     /// Returns the size of a single dimension by index.
@@ -364,7 +367,10 @@ pub trait MetaTensorView {
     /// Borrow the shape vector.
     fn shape(&self) -> &Shape { &self.meta().shape }
     /// Borrow the stride vector.
-    fn stride(&self) -> &Strides { &self.meta().strides }
+    fn strides(&self) -> &Strides { &self.meta().strides }
+    fn byte_strides(&self, item_size: usize) -> Vec<isize> {
+        self.meta().byte_strides(item_size)
+    }
     /// Starting offset (in elements) into the underlying buffer.
     fn offset(&self) -> usize { self.meta().offset }
     /// Number of dimensions (rank).
@@ -390,7 +396,7 @@ pub trait MetaTensorView {
     /// Returns a vector of (dim_index, dim_size, dim_stride) for all non-singleton dimensions.
     fn non_singleton_dims(&self) -> Vec<(usize, Dim, isize)> {
         self.shape().iter()
-            .zip(self.stride().iter())
+            .zip(self.strides().iter())
             .enumerate()
             .filter(|(_, (&d, _))| d > 1)
             .map(|(i, (&d, &s))| (i, d, s))

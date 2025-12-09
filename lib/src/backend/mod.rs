@@ -12,6 +12,7 @@ pub mod cuda_tests;
 pub trait Backend<T: TensorValue> {
     type Buf;
 
+    fn device_type() -> crate::core::primitives::DeviceType;
     fn alloc_from_slice(&self, src: Box<[T]>) -> Result<Self::Buf, TensorError>;
     fn alloc(&self, len: usize) -> Result<Self::Buf, TensorError>;
     fn copy_from_slice(&self, dst: &mut Self::Buf, src: &[T]) -> Result<(), TensorError>;

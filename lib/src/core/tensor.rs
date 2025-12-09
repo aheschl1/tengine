@@ -1,5 +1,5 @@
 
-use crate::{backend::Backend, core::{idx::Idx, meta::is_contiguous_relaxed, primitives::TensorBase, value::TensorValue, Dim, MetaTensor, MetaTensorView, Shape, Strides, TensorView, TensorViewMut}};
+use crate::{backend::Backend, core::{idx::Idx, meta::is_contiguous_relaxed, primitives::{DeviceType, TensorBase}, value::TensorValue, Dim, MetaTensor, Shape, Strides, TensorView, TensorViewMut}};
 use super::slice::{Slice, compute_sliced_parameters};
 use thiserror::Error;
 
@@ -37,6 +37,9 @@ pub enum TensorError {
 pub trait AsView<T: TensorValue, B: Backend<T>> {
     /// Returns an immutable view over the tensor data, sharing the same
     /// underlying buffer and metadata (shape/stride/offset) without copying.
+    fn device(&self) -> DeviceType {
+        B::device_type()
+    }
     fn view(&self) -> TensorView<'_, T, B>;
     fn view_as(&self, shape: Shape) -> Result<TensorView<'_, T, B>, TensorError>;
 }
@@ -100,6 +103,7 @@ impl<T: TensorValue, B: Backend<T>> AsView<T, B> for TensorView<'_, T, B>
     fn view_as(&self, shape: Shape) -> Result<TensorView<'_, T, B>, TensorError> {
         todo!()
     }
+
 }
 
 impl<T: TensorValue, B: Backend<T>> AsView<T, B> for TensorViewMut<'_, T, B> 
