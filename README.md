@@ -26,6 +26,8 @@ Goal is high performance ML stack with minimal dependencies and maximal flexibil
 - [ ] Allow F contiguous for matmul, as well as C.
 - [ ] Matmul not using openblas for other than T=f32/f64
 - [ ] when does a tensor need to be materialized before matmul
+- [ ] .dot() has an extra mem copy (minimal because item); however, this is due to a potential design flaw.
+should methods like squeeze(), unsqueeze(), transpose(), permute() modify the current view instead of returning a new one?
 
 ## Some examples
 
@@ -205,10 +207,13 @@ a += b ;  // b broadcasts along rows of a
 let tensor = Tensor::<i32>::ones((1, 2, 3)); // Shape: (1, 2, 3)
 let permuted = tensor.permute(vec![2, 0, 1]).unwrap(); // Shape: (3, 1, 2)
 
-// unsqueeze
+// unsqueeze and squeeze
 let tensor = Tensor::<f32>::ones((3, 4)); // Shape: (3, 4)
-let unsqueezed = tensor.unsqueeze().unwrap(); // Shape: (1, 3, 4)
+let unsqueezed = tensor.unsqueeze(); // Shape: (1, 3, 4)
 let unsqueezed2 = tensor.unsqueeze_at(2).unwrap(); // Shape: (3, 4, 1)
+
+let squeezed = unsqueezed.squeeze(); // Shape: (3, 4)
+let squeezed2 = unsqueezed2.squeeze_at(2).unwrap(); // would crash but you get the point
 ```
 
 ```rust
@@ -244,4 +249,10 @@ let result = a.matmul(&b).unwrap(); // Shape: (3, 2)
 let a_gpu = a.cuda();
 let b_gpu = b.cuda();
 let result_gpu = a_gpu.matmul(&b_gpu).unwrap(); // Shape: (3, 2)
+
+//Dot product is an implmentation of matmul with extra steps to grow and squeeze the tensors.
+
+let a = Tensor::<f32>::ones((3,));
+let b = Tensor::<f32>::from_buf(vec![4.0, 5.0, 6.0], (3,)).unwrap();
+let result = a.dot(&b).unwrap(); // Scalar tensor with value 15.0
 ```

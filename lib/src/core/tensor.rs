@@ -1,5 +1,5 @@
 
-use crate::{backend::Backend, core::{idx::Idx, meta::is_contiguous_relaxed, primitives::{DeviceType, TensorBase}, value::TensorValue, Dim, MetaTensor, Shape, Strides, TensorView, TensorViewMut}};
+use crate::{backend::Backend, core::{idx::Idx, meta::is_contiguous_relaxed, primitives::{DeviceType, TensorBase}, value::TensorValue, Dim, MetaTensor, MetaTensorView, Shape, Strides, TensorView, TensorViewMut}};
 use super::slice::{Slice, compute_sliced_parameters};
 use thiserror::Error;
 
@@ -211,9 +211,11 @@ pub trait TensorAccess<T: TensorValue, B: Backend<T>>: Sized {
     fn permute(&self, dims: impl Into<Idx>) -> Result<TensorView<'_, T, B>, TensorError>;
     fn transpose(&self) -> Result<TensorView<'_, T, B>, TensorError>;
     fn unsqueeze_at(&self, dim: Dim) -> Result<TensorView<'_, T, B>, TensorError>;
-    fn unsqueeze(&self) -> Result<TensorView<'_, T, B>, TensorError> {
-        self.unsqueeze_at(0)
+    fn unsqueeze(&self) -> TensorView<'_, T, B> {
+        unsafe{self.unsqueeze_at(0).unwrap_unchecked()}
     }
+    fn squeeze_at(&self, dim: Dim) -> Result<TensorView<'_, T, B>, TensorError>;
+    fn squeeze(&self) -> TensorView<'_, T, B>;
 }
 
 pub trait TensorAccessMut<T: TensorValue, B: Backend<T>>: TensorAccess<T, B> {
@@ -232,6 +234,8 @@ pub trait TensorAccessMut<T: TensorValue, B: Backend<T>>: TensorAccess<T, B> {
     fn unsqueeze_mut(&mut self) -> Result<TensorViewMut<'_, T, B>, TensorError> {
         self.unsqueeze_at_mut(0)
     }
+    fn squeeze_at_mut(&mut self, dim: Dim) -> Result<TensorViewMut<'_, T, B>, TensorError>;
+    fn squeeze_mut(&mut self) -> TensorViewMut<'_, T, B>;
 }
 
 impl<T: TensorValue, B: Backend<T>, V> TensorAccess<T, B> for V
@@ -305,6 +309,23 @@ where B: Backend<T>, V: AsView<T, B>
         );
         Ok(res)
     }
+    
+    /// removes dimension at given dim, if its size is 1
+    fn squeeze_at(&self, dim: Dim) -> Result<TensorView<'_, T, B>, TensorError> {
+        let mut view = self.view();
+        let (new_shape, new_stride) = compute_squeezed_parameters(view.shape(), view.strides(), Some(dim))?;
+        view.meta.shape = new_shape;
+        view.meta.strides = new_stride;
+        Ok(view)
+    }
+    
+    fn squeeze(&self) -> TensorView<'_, T, B> {
+        let mut res = self.view();
+        let (new_shape, new_strides) = unsafe { compute_squeezed_parameters(res.shape(), res.strides(), None).unwrap_unchecked() };
+        res.meta.shape = new_shape;
+        res.meta.strides = new_strides;
+        res
+    }
 }
 
 impl<T: TensorValue, B: Backend<T>, V> TensorAccessMut<T, B> for V
@@ -352,19 +373,32 @@ where V: AsViewMut<T, B>
     }
 
     fn unsqueeze_at_mut(&mut self, dim: Dim) -> Result<TensorViewMut<'_, T, B>, TensorError> {
-        let view = self.view_mut();
+        let mut view = self.view_mut();
         let (new_shape, new_strides) = compute_unsqueezed_parameters(
             view.meta.shape(),
             view.meta.strides(),
             dim
         )?;
 
-        let res = TensorViewMut::from_parts(
-            view.buf, 
-            view.backend, 
-            MetaTensor::new(new_shape, new_strides, view.meta.offset())
-        );
-        Ok(res)
+        view.meta.shape = new_shape;
+        view.meta.strides = new_strides;
+        Ok(view)
+    }
+    
+    fn squeeze_at_mut(&mut self, dim: Dim) -> Result<TensorViewMut<'_, T, B>, TensorError> {
+        let mut view = self.view_mut();
+        let (new_shape, new_stride) = compute_squeezed_parameters(view.shape(), view.strides(), Some(dim))?;
+        view.meta.shape = new_shape;
+        view.meta.strides = new_stride;
+        Ok(view)
+    }
+    
+    fn squeeze_mut(&mut self) -> TensorViewMut<'_, T, B> {
+        let mut res = self.view_mut();
+        let (new_shape, new_strides) = unsafe { compute_squeezed_parameters(res.shape(), res.strides(), None).unwrap_unchecked() };
+        res.meta.shape = new_shape;
+        res.meta.strides = new_strides;
+        res
     }
 
 }
@@ -471,4 +505,41 @@ fn compute_unsqueezed_parameters(shape: &Shape, stride: &Strides, dim: Dim) -> R
     new_shape.0.insert(dim, 1);
 
     Ok((new_shape, new_strides))
+}
+
+#[inline]
+fn compute_squeezed_parameters(shape: &Shape, stride: &Strides, dim: Option<Dim>) -> Result<(Shape, Strides), TensorError> {
+    let mut result_shape = shape.clone();
+    let mut result_stride = stride.clone();
+
+    // Validate the dimension if specified
+    if let Some(target_dim) = dim {
+        if target_dim >= shape.len() {
+            return Err(TensorError::InvalidDim(format!(
+                "Dimension {} is out of bounds for tensor with rank {}",
+                target_dim,
+                shape.len()
+            )));
+        }
+    }
+
+    for d in (0..shape.len()).rev() {
+        let should_squeeze = match dim {
+            None => shape[d] == 1,
+            Some(target_dim) => target_dim == d,
+        };
+        
+        if should_squeeze {
+            if shape[d] != 1 {
+                return Err(TensorError::InvalidDim(format!(
+                    "Cannot squeeze dimension {} with size {}",
+                    d,
+                    shape[d]
+                )));
+            }
+            result_shape.0.remove(d);
+            result_stride.0.remove(d);
+        }
+    }
+    Ok((result_shape, result_stride))
 }

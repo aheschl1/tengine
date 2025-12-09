@@ -1,4 +1,4 @@
-use crate::{backend::{BackendMatMul}, core::{primitives::TensorBase, shape_to_stride, tensor::{AsTensor, AsView, TensorError}, value::TensorValue, Dim, MetaTensor, Shape}, ops::linalg::MatMul};
+use crate::{backend::BackendMatMul, core::{primitives::TensorBase, shape_to_stride, tensor::{AsTensor, AsView, TensorAccess, TensorError}, value::TensorValue, Dim, MetaTensor, MetaTensorView, Shape}, ops::linalg::MatMul};
 
 impl<L, R, T, B> MatMul<R, T, B> for L
 where
@@ -86,10 +86,7 @@ where
         out_shape_vec.push(n);
         let out_shape: Shape = out_shape_vec.into();
         let out_strides = shape_to_stride(&out_shape);
-        
-        println!("MatMul: b={}, m={}, k={}, n={}", b, m, k_l, n);
-        println!("LHS Meta: {:?}", lhs_meta);
-        println!("RHS Meta: {:?}", rhs_meta);
+
         let buf = lhs_view.backend.matmul(
             (lhs_view.buf, lhs_meta),
             (rhs_view.buf, rhs_meta),
@@ -104,6 +101,18 @@ where
             buf,
             MetaTensor::new(out_shape, out_strides, 0),
         ))
+    }
+
+    fn dot(&self, rhs: &R) -> Result<TensorBase<T, B>, TensorError> {
+        let lview = self.view();
+        let rview = rhs.view();
+        if lview.rank() != 1 || rview.rank() != 1 {
+            return Err(TensorError::InvalidShape(
+                "Dot product is only defined for 1-D tensors".to_string(),
+            ));
+        }
+
+        Ok(lview.unsqueeze().matmul(unsafe{&rview.unsqueeze_at(1).unwrap_unchecked()})?.squeeze().owned())
     }
 
 }

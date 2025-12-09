@@ -2408,7 +2408,7 @@ mod tests {
         let tensor = make_tensor(buf, shape);
         
         let view = tensor.view();
-        let unsqueezed = view.unsqueeze().unwrap();
+        let unsqueezed = view.unsqueeze();
         
         // Should have shape [1] after unsqueezing
         assert_eq!(*unsqueezed.shape(), vec![1]);
@@ -2424,7 +2424,7 @@ mod tests {
         let tensor = make_tensor(buf, shape);
         
         let view = tensor.view();
-        let unsqueezed = view.unsqueeze().unwrap();
+        let unsqueezed = view.unsqueeze();
         
         // Should have shape [1, 5] after unsqueezing
         assert_eq!(*unsqueezed.shape(), vec![1, 5]);
@@ -2446,7 +2446,7 @@ mod tests {
         let tensor = make_tensor(buf, shape);
         
         let view = tensor.view();
-        let unsqueezed = view.unsqueeze().unwrap();
+        let unsqueezed = view.unsqueeze();
         
         // Should have shape [1, 2, 3] after unsqueezing
         assert_eq!(*unsqueezed.shape(), vec![1, 2, 3]);
@@ -2469,10 +2469,10 @@ mod tests {
         let tensor = make_tensor(buf, shape);
         
         let view = tensor.view();
-        let unsqueezed_once = view.unsqueeze().unwrap();
+        let unsqueezed_once = view.unsqueeze();
         assert_eq!(*unsqueezed_once.shape(), vec![1, 3]);
         
-        let unsqueezed_twice = unsqueezed_once.unsqueeze().unwrap();
+        let unsqueezed_twice = unsqueezed_once.unsqueeze();
         assert_eq!(*unsqueezed_twice.shape(), vec![1, 1, 3]);
         assert_eq!(*unsqueezed_twice.strides(), vec![3, 3, 1]);
         
@@ -2495,7 +2495,7 @@ mod tests {
         assert_eq!(*sliced.shape(), vec![3]);
         
         // Now unsqueeze the slice
-        let unsqueezed = sliced.unsqueeze().unwrap();
+        let unsqueezed = sliced.unsqueeze();
         assert_eq!(*unsqueezed.shape(), vec![1, 3]);
         assert_eq!(*unsqueezed.strides(), vec![3, 1]);
         
@@ -2519,7 +2519,7 @@ mod tests {
         assert_eq!(*sliced.strides(), vec![3]);  // Non-unit stride
         
         // Now unsqueeze the slice
-        let unsqueezed = sliced.unsqueeze().unwrap();
+        let unsqueezed = sliced.unsqueeze();
         assert_eq!(*unsqueezed.shape(), vec![1, 2]);
         assert_eq!(*unsqueezed.strides(), vec![6, 3]);  // Stride should be computed correctly
         
@@ -2636,7 +2636,7 @@ mod tests {
         let tensor = make_tensor(buf, shape);
         
         let view = tensor.view();
-        let unsqueezed = view.unsqueeze().unwrap();
+        let unsqueezed = view.unsqueeze();
         
         // Shape should be [1, 3, 4]
         assert_eq!(*unsqueezed.shape(), vec![1, 3, 4]);
@@ -2675,7 +2675,7 @@ mod tests {
         let tensor = make_tensor(buf, shape);
         
         let view = tensor.view();
-        let unsqueezed = view.unsqueeze().unwrap();
+        let unsqueezed = view.unsqueeze();
         
         // Shape should be [1, 2, 3, 4]
         assert_eq!(*unsqueezed.shape(), vec![1, 2, 3, 4]);
@@ -3404,6 +3404,515 @@ mod tests {
         // Dimension 4 is out of bounds
         sliced.unsqueeze_at(4).unwrap();
     }
+
+    // ============================================================================
+    // SQUEEZE TESTS
+    // ============================================================================
+
+    #[test]
+    fn test_squeeze_basic_2d() {
+        // Test squeezing a single dimension from [1, 3] -> [3]
+        let tensor = make_tensor(vec![1, 2, 3], vec![1, 3]);
+        let squeezed = tensor.squeeze();
+        
+        assert_eq!(*squeezed.shape(), vec![3]);
+        assert_eq!(*squeezed.strides(), vec![1]);
+        assert!(!squeezed.is_scalar());
+        assert_eq!(index_tensor(Idx::At(0), &squeezed).unwrap(), 1);
+        assert_eq!(index_tensor(Idx::At(1), &squeezed).unwrap(), 2);
+        assert_eq!(index_tensor(Idx::At(2), &squeezed).unwrap(), 3);
+    }
+
+    #[test]
+    fn test_squeeze_basic_3d() {
+        // Test squeezing from [1, 2, 1, 3] -> [2, 3]
+        let tensor = make_tensor(vec![1, 2, 3, 4, 5, 6], vec![1, 2, 1, 3]);
+        let squeezed = tensor.squeeze();
+        
+        assert_eq!(*squeezed.shape(), vec![2, 3]);
+        assert_eq!(*squeezed.strides(), vec![3, 1]);
+        assert_eq!(index_tensor(coord![0, 0], &squeezed).unwrap(), 1);
+        assert_eq!(index_tensor(coord![0, 2], &squeezed).unwrap(), 3);
+        assert_eq!(index_tensor(coord![1, 0], &squeezed).unwrap(), 4);
+        assert_eq!(index_tensor(coord![1, 2], &squeezed).unwrap(), 6);
+    }
+
+    #[test]
+    fn test_squeeze_all_dimensions() {
+        // Test squeezing tensor with all size-1 dims [1, 1, 1] -> []
+        let tensor = make_tensor(vec![42], vec![1, 1, 1]);
+        let squeezed = tensor.squeeze();
+        
+        assert_eq!(*squeezed.shape(), vec![]);
+        assert_eq!(*squeezed.strides(), vec![]);
+        assert_eq!(index_tensor(Idx::Item, &squeezed).unwrap(), 42);
+    }
+
+    #[test]
+    fn test_squeeze_no_size_one_dims() {
+        // Test that squeezing a tensor with no size-1 dims doesn't change it
+        let tensor = make_tensor(vec![1, 2, 3, 4, 5, 6], vec![2, 3]);
+        let squeezed = tensor.squeeze();
+        
+        assert_eq!(*squeezed.shape(), vec![2, 3]);
+        assert_eq!(*squeezed.strides(), vec![3, 1]);
+        assert_eq!(index_tensor(coord![0, 0], &squeezed).unwrap(), 1);
+        assert_eq!(index_tensor(coord![1, 2], &squeezed).unwrap(), 6);
+    }
+
+    #[test]
+    fn test_squeeze_at_specific_dim() {
+        // Test squeezing a specific dimension
+        let tensor = make_tensor(vec![1, 2, 3, 4, 5, 6], vec![1, 2, 3]);
+        let squeezed = tensor.squeeze_at(0).unwrap();
+        
+        assert_eq!(*squeezed.shape(), vec![2, 3]);
+        assert_eq!(*squeezed.strides(), vec![3, 1]);
+        assert_eq!(index_tensor(coord![0, 0], &squeezed).unwrap(), 1);
+        assert_eq!(index_tensor(coord![1, 2], &squeezed).unwrap(), 6);
+    }
+
+    #[test]
+    fn test_squeeze_at_middle_dim() {
+        // Test squeezing middle dimension [2, 1, 3] -> [2, 3]
+        let tensor = make_tensor(vec![1, 2, 3, 4, 5, 6], vec![2, 1, 3]);
+        let squeezed = tensor.squeeze_at(1).unwrap();
+        
+        assert_eq!(*squeezed.shape(), vec![2, 3]);
+        assert_eq!(*squeezed.strides(), vec![3, 1]);
+        assert_eq!(index_tensor(coord![0, 0], &squeezed).unwrap(), 1);
+        assert_eq!(index_tensor(coord![1, 2], &squeezed).unwrap(), 6);
+    }
+
+    #[test]
+    fn test_squeeze_at_end_dim() {
+        // Test squeezing end dimension [2, 3, 1] -> [2, 3]
+        let tensor = make_tensor(vec![1, 2, 3, 4, 5, 6], vec![2, 3, 1]);
+        let squeezed = tensor.squeeze_at(2).unwrap();
+        
+        assert_eq!(*squeezed.shape(), vec![2, 3]);
+        assert_eq!(*squeezed.strides(), vec![3, 1]);
+        assert_eq!(index_tensor(coord![0, 0], &squeezed).unwrap(), 1);
+        assert_eq!(index_tensor(coord![1, 2], &squeezed).unwrap(), 6);
+    }
+
+    #[test]
+    fn test_squeeze_after_slice() {
+        // Test squeezing after slicing
+        let tensor = make_tensor(vec![1, 2, 3, 4, 5, 6], vec![2, 3]);
+        
+        // Slice to get a single row: shape [3]
+        let sliced = tensor.slice(0, 0..0).unwrap();
+        assert_eq!(*sliced.shape(), vec![3]);
+        
+        // Unsqueeze to [1, 3], then squeeze back to [3]
+        let unsqueezed = sliced.unsqueeze_at(0).unwrap();
+        assert_eq!(*unsqueezed.shape(), vec![1, 3]);
+        
+        let squeezed = unsqueezed.squeeze();
+        assert_eq!(*squeezed.shape(), vec![3]);
+        assert_eq!(index_tensor(Idx::At(0), &squeezed).unwrap(), 1);
+        assert_eq!(index_tensor(Idx::At(2), &squeezed).unwrap(), 3);
+    }
+
+    #[test]
+    fn test_squeeze_after_column_slice() {
+        // Test squeezing after column slicing
+        let tensor = make_tensor(vec![1, 2, 3, 4, 5, 6], vec![2, 3]);
+        
+        // Slice to get a single column: shape [2]
+        let sliced = tensor.slice(1, 1..1).unwrap();
+        assert_eq!(*sliced.shape(), vec![2]);
+        assert_eq!(index_tensor(Idx::At(0), &sliced).unwrap(), 2);
+        assert_eq!(index_tensor(Idx::At(1), &sliced).unwrap(), 5);
+        
+        // Unsqueeze to [2, 1], then squeeze
+        let unsqueezed = sliced.unsqueeze_at(1).unwrap();
+        assert_eq!(*unsqueezed.shape(), vec![2, 1]);
+        
+        let squeezed = unsqueezed.squeeze();
+        assert_eq!(*squeezed.shape(), vec![2]);
+        assert_eq!(index_tensor(Idx::At(0), &squeezed).unwrap(), 2);
+        assert_eq!(index_tensor(Idx::At(1), &squeezed).unwrap(), 5);
+    }
+
+    #[test]
+    fn test_squeeze_after_3d_slice() {
+        // Test squeezing after 3D slicing
+        let tensor = make_tensor(
+            (1..=24).collect::<Vec<i32>>(), 
+            vec![2, 3, 4]
+        );
+        
+        // Slice along first dimension to get [3, 4]
+        let sliced = tensor.slice(0, 1..1).unwrap();
+        assert_eq!(*sliced.shape(), vec![3, 4]);
+        
+        // Unsqueeze to [1, 3, 4]
+        let unsqueezed = sliced.unsqueeze_at(0).unwrap();
+        assert_eq!(*unsqueezed.shape(), vec![1, 3, 4]);
+        
+        // Squeeze back
+        let squeezed = unsqueezed.squeeze();
+        assert_eq!(*squeezed.shape(), vec![3, 4]);
+        assert_eq!(index_tensor(coord![0, 0], &squeezed).unwrap(), 13);
+        assert_eq!(index_tensor(coord![2, 3], &squeezed).unwrap(), 24);
+    }
+
+    #[test]
+    fn test_squeeze_mut_basic() {
+        // Test mutable squeeze
+        let mut tensor = make_tensor(vec![1, 2, 3], vec![1, 3]);
+        let mut squeezed = tensor.squeeze_mut();
+        
+        assert_eq!(*squeezed.shape(), vec![3]);
+        assert_eq!(*squeezed.strides(), vec![1]);
+        
+        // Modify through squeezed view
+        squeezed.set(Idx::At(1), 20).unwrap();
+        
+        // Check modification persisted
+        assert_eq!(index_tensor(Idx::At(1), &squeezed).unwrap(), 20);
+    }
+
+    #[test]
+    fn test_squeeze_mut_after_modifications() {
+        // Test that modifications after squeezing work correctly
+        let mut tensor = make_tensor(vec![1, 2, 3, 4, 5, 6], vec![1, 2, 3]);
+        
+        let mut squeezed = tensor.squeeze_mut();
+        assert_eq!(*squeezed.shape(), vec![2, 3]);
+        
+        // Modify several elements
+        squeezed.set(coord![0, 0], 10).unwrap();
+        squeezed.set(coord![0, 2], 30).unwrap();
+        squeezed.set(coord![1, 1], 50).unwrap();
+        
+        // Verify modifications
+        assert_eq!(index_tensor(coord![0, 0], &squeezed).unwrap(), 10);
+        assert_eq!(index_tensor(coord![0, 2], &squeezed).unwrap(), 30);
+        assert_eq!(index_tensor(coord![1, 1], &squeezed).unwrap(), 50);
+        
+        // Original values unchanged where not modified
+        assert_eq!(index_tensor(coord![0, 1], &squeezed).unwrap(), 2);
+        assert_eq!(index_tensor(coord![1, 0], &squeezed).unwrap(), 4);
+    }
+
+    #[test]
+    fn test_squeeze_at_mut_basic() {
+        // Test mutable squeeze_at
+        let mut tensor = make_tensor(vec![1, 2, 3, 4, 5, 6], vec![2, 1, 3]);
+        let mut squeezed = tensor.squeeze_at_mut(1).unwrap();
+        
+        assert_eq!(*squeezed.shape(), vec![2, 3]);
+        
+        // Modify through squeezed view
+        squeezed.set(coord![0, 0], 10).unwrap();
+        squeezed.set(coord![1, 2], 60).unwrap();
+        
+        assert_eq!(index_tensor(coord![0, 0], &squeezed).unwrap(), 10);
+        assert_eq!(index_tensor(coord![1, 2], &squeezed).unwrap(), 60);
+    }
+
+    #[test]
+    fn test_squeeze_mut_after_slice() {
+        // Test mutable squeeze after slicing
+        let mut tensor = make_tensor(
+            (1..=12).collect::<Vec<i32>>(), 
+            vec![3, 4]
+        );
+        
+        // Slice to get middle row: [4]
+        let mut sliced = tensor.slice_mut(0, 1..1).unwrap();
+        assert_eq!(*sliced.shape(), vec![4]);
+        
+        // Unsqueeze to [1, 4]
+        let mut unsqueezed = sliced.unsqueeze_at_mut(0).unwrap();
+        assert_eq!(*unsqueezed.shape(), vec![1, 4]);
+        
+        // Squeeze back to [4]
+        let mut squeezed = unsqueezed.squeeze_mut();
+        assert_eq!(*squeezed.shape(), vec![4]);
+        
+        // Modify through squeezed view
+        squeezed.set(Idx::At(0), 50).unwrap();
+        squeezed.set(Idx::At(3), 80).unwrap();
+        
+        assert_eq!(index_tensor(Idx::At(0), &squeezed).unwrap(), 50);
+        assert_eq!(index_tensor(Idx::At(3), &squeezed).unwrap(), 80);
+    }
+
+    #[test]
+    fn test_squeeze_mut_after_column_slice() {
+        // Test mutable squeeze after column slicing
+        let mut tensor = make_tensor(
+            vec![
+                1, 2, 3,
+                4, 5, 6,
+                7, 8, 9
+            ], 
+            vec![3, 3]
+        );
+        
+        // Slice to get middle column: [3]
+        let mut sliced = tensor.slice_mut(1, 1..1).unwrap();
+        assert_eq!(*sliced.shape(), vec![3]);
+        assert_eq!(index_tensor(Idx::At(0), &sliced).unwrap(), 2);
+        assert_eq!(index_tensor(Idx::At(1), &sliced).unwrap(), 5);
+        assert_eq!(index_tensor(Idx::At(2), &sliced).unwrap(), 8);
+        
+        // Unsqueeze and squeeze
+        let mut unsqueezed = sliced.unsqueeze_at_mut(1).unwrap();
+        let mut squeezed = unsqueezed.squeeze_mut();
+        
+        // Modify
+        squeezed.set(Idx::At(0), 20).unwrap();
+        squeezed.set(Idx::At(2), 80).unwrap();
+        
+        assert_eq!(index_tensor(Idx::At(0), &squeezed).unwrap(), 20);
+        assert_eq!(index_tensor(Idx::At(1), &squeezed).unwrap(), 5);
+        assert_eq!(index_tensor(Idx::At(2), &squeezed).unwrap(), 80);
+    }
+
+    #[test]
+    fn test_squeeze_chained_with_slices() {
+        // Test complex chaining: slice -> unsqueeze -> slice -> unsqueeze -> squeeze
+        let tensor = make_tensor(
+            (1..=24).collect::<Vec<i32>>(), 
+            vec![2, 3, 4]
+        );
+        
+        // Slice along dim 0: [3, 4]
+        let slice1 = tensor.slice(0, 0..0).unwrap();
+        assert_eq!(*slice1.shape(), vec![3, 4]);
+        
+        // Unsqueeze at dim 1: [3, 1, 4]
+        let unsqueezed1 = slice1.unsqueeze_at(1).unwrap();
+        assert_eq!(*unsqueezed1.shape(), vec![3, 1, 4]);
+        
+        // Slice along dim 2: [3, 1]
+        let slice2 = unsqueezed1.slice(2, 2..2).unwrap();
+        assert_eq!(*slice2.shape(), vec![3, 1]);
+        
+        // Unsqueeze at dim 0: [1, 3, 1]
+        let unsqueezed2 = slice2.unsqueeze_at(0).unwrap();
+        assert_eq!(*unsqueezed2.shape(), vec![1, 3, 1]);
+        
+        // Squeeze all: [3]
+        let squeezed = unsqueezed2.squeeze();
+        assert_eq!(*squeezed.shape(), vec![3]);
+        assert_eq!(index_tensor(Idx::At(0), &squeezed).unwrap(), 3);
+        assert_eq!(index_tensor(Idx::At(1), &squeezed).unwrap(), 7);
+        assert_eq!(index_tensor(Idx::At(2), &squeezed).unwrap(), 11);
+    }
+
+    #[test]
+    fn test_squeeze_preserves_data_after_negative_stride() {
+        // Test that squeeze works correctly with negative strides
+        let tensor = make_tensor(vec![1, 2, 3, 4, 5, 6], vec![6]);
+        
+        // Reverse with negative stride
+        let reversed = tensor.slice(0, Slice::full().step(-1)).unwrap();
+        assert_eq!(index_tensor(Idx::At(0), &reversed).unwrap(), 6);
+        assert_eq!(index_tensor(Idx::At(5), &reversed).unwrap(), 1);
+        
+        // Unsqueeze to [1, 6] with negative stride
+        let unsqueezed = reversed.unsqueeze_at(0).unwrap();
+        assert_eq!(*unsqueezed.shape(), vec![1, 6]);
+        
+        // Squeeze back to [6]
+        let squeezed = unsqueezed.squeeze();
+        assert_eq!(*squeezed.shape(), vec![6]);
+        
+        // Verify data is still reversed
+        assert_eq!(index_tensor(Idx::At(0), &squeezed).unwrap(), 6);
+        assert_eq!(index_tensor(Idx::At(5), &squeezed).unwrap(), 1);
+    }
+
+    #[test]
+    fn test_squeeze_multiple_dims_2d() {
+        // Test squeezing multiple dimensions at once
+        let tensor = make_tensor(vec![1, 2, 3, 4, 5, 6], vec![1, 6, 1]);
+        let squeezed = tensor.squeeze();
+        
+        assert_eq!(*squeezed.shape(), vec![6]);
+        assert_eq!(*squeezed.strides(), vec![1]);
+        for i in 0..6 {
+            assert_eq!(index_tensor(Idx::At(i), &squeezed).unwrap(), (i + 1) as i32);
+        }
+    }
+
+    #[test]
+    fn test_squeeze_multiple_dims_4d() {
+        // Test squeezing from [1, 2, 1, 3, 1] -> [2, 3]
+        let tensor = make_tensor(vec![1, 2, 3, 4, 5, 6], vec![1, 2, 1, 3, 1]);
+        let squeezed = tensor.squeeze();
+        
+        assert_eq!(*squeezed.shape(), vec![2, 3]);
+        assert_eq!(*squeezed.strides(), vec![3, 1]);
+        assert_eq!(index_tensor(coord![0, 0], &squeezed).unwrap(), 1);
+        assert_eq!(index_tensor(coord![1, 2], &squeezed).unwrap(), 6);
+    }
+
+    #[test]
+    fn test_squeeze_then_modify_mut() {
+        // Test that modifications work correctly after squeeze
+        let mut tensor = make_tensor(
+            vec![1, 2, 3, 4, 5, 6, 7, 8], 
+            vec![1, 2, 4, 1]
+        );
+        
+        let mut squeezed = tensor.squeeze_mut();
+        assert_eq!(*squeezed.shape(), vec![2, 4]);
+        
+        // Modify all elements in first row
+        for i in 0..4 {
+            squeezed.set(coord![0, i], (i * 10) as i32).unwrap();
+        }
+        
+        // Verify modifications
+        assert_eq!(index_tensor(coord![0, 0], &squeezed).unwrap(), 0);
+        assert_eq!(index_tensor(coord![0, 1], &squeezed).unwrap(), 10);
+        assert_eq!(index_tensor(coord![0, 2], &squeezed).unwrap(), 20);
+        assert_eq!(index_tensor(coord![0, 3], &squeezed).unwrap(), 30);
+        
+        // Second row should be unchanged
+        assert_eq!(index_tensor(coord![1, 0], &squeezed).unwrap(), 5);
+        assert_eq!(index_tensor(coord![1, 3], &squeezed).unwrap(), 8);
+    }
+
+    #[test]
+    fn test_squeeze_scalar_to_tensor() {
+        // Test squeezing a scalar (no-op)
+        let tensor = make_tensor(vec![42], vec![]);
+        let squeezed = tensor.squeeze();
+        
+        assert_eq!(*squeezed.shape(), vec![]);
+        assert_eq!(index_tensor(Idx::Item, &squeezed).unwrap(), 42);
+    }
+
+    #[test]
+    fn test_squeeze_at_then_slice() {
+        // Test slicing after squeeze_at
+        let tensor = make_tensor((1..=12).collect::<Vec<i32>>(), vec![1, 3, 4]);
+        let squeezed = tensor.squeeze_at(0).unwrap();
+        
+        assert_eq!(*squeezed.shape(), vec![3, 4]);
+        
+        // Now slice the squeezed tensor
+        let sliced = squeezed.slice(0, 1..1).unwrap();
+        assert_eq!(*sliced.shape(), vec![4]);
+        assert_eq!(index_tensor(Idx::At(0), &sliced).unwrap(), 5);
+        assert_eq!(index_tensor(Idx::At(3), &sliced).unwrap(), 8);
+    }
+
+    #[test]
+    fn test_double_squeeze_at() {
+        // Test applying squeeze_at multiple times
+        let tensor = make_tensor(vec![1, 2, 3, 4], vec![1, 2, 1, 2]);
+        
+        let squeezed1 = tensor.squeeze_at(0).unwrap();
+        assert_eq!(*squeezed1.shape(), vec![2, 1, 2]);
+        
+        let squeezed2 = squeezed1.squeeze_at(1).unwrap();
+        assert_eq!(*squeezed2.shape(), vec![2, 2]);
+        
+        assert_eq!(index_tensor(coord![0, 0], &squeezed2).unwrap(), 1);
+        assert_eq!(index_tensor(coord![0, 1], &squeezed2).unwrap(), 2);
+        assert_eq!(index_tensor(coord![1, 0], &squeezed2).unwrap(), 3);
+        assert_eq!(index_tensor(coord![1, 1], &squeezed2).unwrap(), 4);
+    }
+
+    #[test]
+    fn test_squeeze_unsqueeze_roundtrip() {
+        // Test that squeeze and unsqueeze are inverses
+        let tensor = make_tensor(vec![1, 2, 3, 4, 5, 6], vec![2, 3]);
+        
+        // Unsqueeze at various positions
+        let unsqueezed = tensor.unsqueeze_at(0).unwrap();
+        assert_eq!(*unsqueezed.shape(), vec![1, 2, 3]);
+        
+        // Squeeze back
+        let squeezed = unsqueezed.squeeze_at(0).unwrap();
+        assert_eq!(*squeezed.shape(), vec![2, 3]);
+        assert_eq!(*squeezed.strides(), vec![3, 1]);
+        
+        // Verify data integrity
+        assert_eq!(index_tensor(coord![0, 0], &squeezed).unwrap(), 1);
+        assert_eq!(index_tensor(coord![1, 2], &squeezed).unwrap(), 6);
+    }
+
+    // ============================================================================
+    // SQUEEZE ERROR CASES
+    // ============================================================================
+
+    #[test]
+    #[should_panic]
+    fn test_squeeze_at_non_singleton_dim() {
+        // Test that squeeze_at fails when dimension size is not 1
+        let tensor = make_tensor(vec![1, 2, 3, 4, 5, 6], vec![2, 3]);
+        tensor.squeeze_at(0).unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_squeeze_at_invalid_dim() {
+        // Test that squeeze_at fails with invalid dimension
+        let tensor = make_tensor(vec![1, 2, 3], vec![1, 3]);
+        tensor.squeeze_at(5).unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_squeeze_at_mut_non_singleton_dim() {
+        // Test that squeeze_at_mut fails when dimension size is not 1
+        let mut tensor = make_tensor(vec![1, 2, 3, 4, 5, 6], vec![2, 3]);
+        tensor.squeeze_at_mut(1).unwrap();
+    }
+
+    #[test]
+    fn test_squeeze_preserves_contiguity() {
+        // Test that squeeze preserves contiguous layout
+        let tensor = make_tensor(vec![1, 2, 3, 4, 5, 6], vec![1, 2, 3]);
+        assert!(tensor.is_contiguous());
+        
+        let squeezed = tensor.squeeze();
+        assert_eq!(*squeezed.shape(), vec![2, 3]);
+        assert!(squeezed.is_contiguous());
+    }
+
+    #[test]
+    fn test_squeeze_with_non_contiguous_slice() {
+        // Test squeezing a non-contiguous slice
+        let tensor = make_tensor(
+            vec![
+                1, 2, 3,
+                4, 5, 6,
+                7, 8, 9
+            ], 
+            vec![3, 3]
+        );
+        
+        // Get column slice (non-contiguous)
+        let col_slice = tensor.slice(1, 1..1).unwrap();
+        assert_eq!(*col_slice.shape(), vec![3]);
+        assert!(!col_slice.is_contiguous());
+        
+        // Unsqueeze it
+        let unsqueezed = col_slice.unsqueeze_at(1).unwrap();
+        assert_eq!(*unsqueezed.shape(), vec![3, 1]);
+        
+        // Squeeze it back
+        let squeezed = unsqueezed.squeeze();
+        assert_eq!(*squeezed.shape(), vec![3]);
+        
+        // Verify data
+        assert_eq!(index_tensor(Idx::At(0), &squeezed).unwrap(), 2);
+        assert_eq!(index_tensor(Idx::At(1), &squeezed).unwrap(), 5);
+        assert_eq!(index_tensor(Idx::At(2), &squeezed).unwrap(), 8);
+    }
+
+    
 }
 
 

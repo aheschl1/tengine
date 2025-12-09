@@ -24,6 +24,7 @@ impl<B: Backend<T>, T: TensorValue> Clone for TensorBase<T, B> {
             meta: self.meta.clone(),
             _t: PhantomData,
         }
+
     }
 }
 
@@ -244,6 +245,7 @@ where
         let min_buf = vec![T::min(); element_count];
         Self::from_buf(min_buf, shape).expect("Failed to allocate memory")
     }
+
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

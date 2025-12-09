@@ -8,6 +8,7 @@ where
     B: Backend<T>,
 {
     fn matmul(&self, rhs: &Rhs) -> Result<TensorBase<T, B>, TensorError>;
+    fn dot(&self, rhs: &Rhs) -> Result<TensorBase<T, B>, TensorError>;
 }
 
 #[cfg(test)]
@@ -1325,6 +1326,65 @@ mod tests {
         assert_eq!(result, expected);
     }
 
+    #[test]
+    fn test_dot() {
+        let a = Tensor::<f32>::from_buf(vec![1.0, 2.0, 3.0], vec![3]).unwrap();
+        let b = Tensor::<f32>::from_buf(vec![4.0, 5.0, 6.0], vec![3]).unwrap();
+
+        let result = a.dot(&b).unwrap();
+        let expected = 1.0*4.0 + 2.0*5.0 + 3.0*6.0;
+
+        assert!(result.is_scalar());
+        assert!((result - expected).item().unwrap().abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_dot_with_zeros() {
+        // Dot product with a zero vector should produce zero
+        let a = Tensor::<f32>::from_buf(vec![1.0, 2.0, 3.0], vec![3]).unwrap();
+        let b = Tensor::<f32>::from_buf(vec![0.0, 0.0, 0.0], vec![3]).unwrap();
+
+        let result = a.dot(&b).unwrap();
+        assert!(result.is_scalar());
+        assert!((result.item().unwrap()).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_dot_orthogonal_vectors() {
+        // Dot product of orthogonal vectors should be zero
+        let a = Tensor::<f32>::from_buf(vec![1.0, 0.0, 0.0], vec![3]).unwrap();
+        let b = Tensor::<f32>::from_buf(vec![0.0, 1.0, 0.0], vec![3]).unwrap();
+
+        let result = a.dot(&b).unwrap();
+        assert!(result.is_scalar());
+        assert!((result.item().unwrap()).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_dot_single_element() {
+        // Dot product of single-element vectors
+        let a = Tensor::<f32>::from_buf(vec![5.0], vec![1]).unwrap();
+        let b = Tensor::<f32>::from_buf(vec![3.0], vec![1]).unwrap();
+
+        let result = a.dot(&b).unwrap();
+        let expected = 5.0 * 3.0;
+
+        assert!(result.is_scalar());
+        assert!((result.item().unwrap() - expected).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_dot_negative_values() {
+        // Dot product with negative values
+        let a = Tensor::<f32>::from_buf(vec![-1.0, 2.0, -3.0], vec![3]).unwrap();
+        let b = Tensor::<f32>::from_buf(vec![4.0, -5.0, 6.0], vec![3]).unwrap();
+
+        let result = a.dot(&b).unwrap();
+        let expected = (-1.0)*4.0 + 2.0*(-5.0) + (-3.0)*6.0;
+
+        assert!(result.is_scalar());
+        assert!((result.item().unwrap() - expected).abs() < 1e-6);
+    }
 
 }
 
@@ -2635,6 +2695,55 @@ mod cuda_tests {
         assert_eq!(result.cpu().unwrap(), expected.cpu().unwrap());
     }
 
+    // ============================================================================
+    // DOT PRODUCT TESTS (CUDA)
+    // ============================================================================
+
+    #[test]
+    fn test_cuda_dot_basic() {
+        // Basic dot product on CUDA
+        let a = CudaTensor::<f32>::from_buf(vec![1.0, 2.0, 3.0], vec![3]).unwrap();
+        let b = CudaTensor::<f32>::from_buf(vec![4.0, 5.0, 6.0], vec![3]).unwrap();
+
+        let result = a.dot(&b).unwrap();
+        let expected = 1.0*4.0 + 2.0*5.0 + 3.0*6.0;
+
+        assert!(result.is_scalar());
+        let result_cpu = result.cpu().unwrap();
+        assert!((result_cpu.item().unwrap() - expected).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_cuda_dot_larger_vectors() {
+        // Dot product with larger vectors
+        let size = 100;
+        let a_data: Vec<f32> = (0..size).map(|i| i as f32).collect();
+        let b_data: Vec<f32> = (0..size).map(|i| (i as f32) * 2.0).collect();
+
+        let a = CudaTensor::<f32>::from_buf(a_data.clone(), vec![size]).unwrap();
+        let b = CudaTensor::<f32>::from_buf(b_data.clone(), vec![size]).unwrap();
+
+        let result = a.dot(&b).unwrap();
+        
+        // Expected: sum of i * (i*2) for i in 0..100
+        let expected: f32 = a_data.iter().zip(&b_data).map(|(x, y)| x * y).sum();
+
+        assert!(result.is_scalar());
+        let result_cpu = result.cpu().unwrap();
+        assert!((result_cpu.item().unwrap() - expected).abs() < 1e-3);
+    }
+
+    #[test]
+    fn test_cuda_dot_orthogonal_vectors() {
+        // Dot product of orthogonal unit vectors should be zero
+        let a = CudaTensor::<f32>::from_buf(vec![1.0, 0.0, 0.0], vec![3]).unwrap();
+        let b = CudaTensor::<f32>::from_buf(vec![0.0, 1.0, 0.0], vec![3]).unwrap();
+
+        let result = a.dot(&b).unwrap();
+        assert!(result.is_scalar());
+        let result_cpu = result.cpu().unwrap();
+        assert!(result_cpu.item().unwrap().abs() < 1e-6);
+    }
 
 }
 
