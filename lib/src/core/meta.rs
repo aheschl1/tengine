@@ -454,7 +454,7 @@ impl MetaTensorView for MetaTensor {
 
 impl<B, T: TensorValue> MetaTensorView for TensorBase<T, B> 
 where
-    B: Backend<T>,
+    B: Backend,
 {
     fn meta(&self) -> &MetaTensor {
         &self.meta
@@ -463,16 +463,14 @@ where
 
 impl<T: TensorValue, B> MetaTensorView for TensorView<'_, T, B>
 where
-    B: Backend<T>,
+    B: Backend,
 {
     fn meta(&self) -> &MetaTensor {
         &self.meta
     }
 }
 
-impl <T: TensorValue, B> MetaTensorView for TensorViewMut<'_, T, B>
-where
-    B: Backend<T>,
+impl <T: TensorValue, B: Backend> MetaTensorView for TensorViewMut<'_, T, B>
 {
     fn meta(&self) -> &MetaTensor {
         &self.meta

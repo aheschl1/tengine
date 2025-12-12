@@ -11,14 +11,14 @@ use crate::core::tensor::TensorError;
 /// This is the base type for all tensors, parameterized by element type `T` and backend `B`.
 /// Most users will use type aliases like `Tensor<T>` (CPU) or `CudaTensor<T>` (GPU).
 #[derive(Debug, PartialEq, Eq)]
-pub struct TensorBase<T: TensorValue, B: Backend<T>> {
+pub struct TensorBase<T: TensorValue, B: Backend> {
     pub(crate) backend: B,
-    pub(crate) buf: B::Buf,
+    pub(crate) buf: B::Buf<T>,
     pub(crate) meta: MetaTensor,
     _t: PhantomData<T>,
 }
 
-impl<B: Backend<T>, T: TensorValue> Clone for TensorBase<T, B> {
+impl<B: Backend, T: TensorValue> Clone for TensorBase<T, B> {
     fn clone(&self) -> Self {
         let new_backend = B::new();
         let new_buffer = new_backend.copy(&self.buf).unwrap();
@@ -74,9 +74,9 @@ impl<T: TensorValue> Tensor<T> {
 pub struct TensorView<'a, T, B>
 where
     T: TensorValue,
-    B: Backend<T> + 'a,
+    B: Backend + 'a,
 {
-    pub(crate) buf: &'a B::Buf,
+    pub(crate) buf: &'a B::Buf<T>,
     pub(crate) backend: &'a B,
     pub(crate) meta: MetaTensor,
 }
@@ -87,9 +87,9 @@ where
 pub struct TensorViewMut<'a, T, B>
 where
     T: TensorValue,
-    B: Backend<T> + 'a,
+    B: Backend + 'a,
 {
-    pub(crate) buf: &'a mut B::Buf,
+    pub(crate) buf: &'a mut B::Buf<T>,
     pub(crate) backend: &'a B,
     pub(crate) meta: MetaTensor,
 }
@@ -97,12 +97,12 @@ where
 impl<'a, T, B> TensorView<'a, T, B>
 where
     T: TensorValue,
-    B: Backend<T> + 'a,
+    B: Backend + 'a,
 {
     /// Builds a tensor view from raw storage and metadata. No copying occurs;
     /// caller guarantees that `meta` correctly describes the layout within `raw`.
     pub(crate) fn from_parts(
-        buf: &'a B::Buf,
+        buf: &'a B::Buf<T>,
         backend: &'a B,
         meta: MetaTensor
     ) -> Self {
@@ -117,12 +117,12 @@ where
 impl<'a, T, B> TensorViewMut<'a, T, B>
 where
     T: TensorValue,
-    B: Backend<T> + 'a,
+    B: Backend + 'a,
 {
     /// Builds a tensor view from raw storage and metadata. No copying occurs;
     /// caller guarantees that `meta` correctly describes the layout within `raw`.
     pub(crate) fn from_parts(
-        raw: &'a mut B::Buf,
+        raw: &'a mut B::Buf<T>,
         backend: &'a B,
         meta: MetaTensor
     ) -> Self {
@@ -143,11 +143,11 @@ pub type CudaTensorViewMut<'a, T> = TensorViewMut<'a, T, crate::backend::cuda::C
 
 impl<B, T: TensorValue> TensorBase<T, B> 
 where 
-    B: Backend<T>,
+    B: Backend,
 {
     /// Internal constructor from raw parts. Used for creating tensors from
     /// existing backend buffers without copying.
-    pub(crate) fn from_parts(backend: B, raw: B::Buf, meta: MetaTensor) -> Self {
+    pub(crate) fn from_parts(backend: B, raw: B::Buf<T>, meta: MetaTensor) -> Self {
         Self {
             backend,
             buf: raw,

@@ -10,7 +10,7 @@ macro_rules! impl_mul_assign {
         impl<T, B> MulAssign<$rhs_type> for TensorBase<T, B>
         where
             T: TensorValue,
-            B: Backend<T>,
+            B: Backend,
         {
             fn mul_assign(&mut self, rhs: $rhs_type) {
                 let (out_shape, broadcast_stra, broadcast_strb) =
@@ -29,9 +29,9 @@ macro_rules! impl_mul_assign {
 
                 unsafe {
                     self.backend.broadcast(
-                        (&self.buf as *const B::Buf, &meta_a),
-                        (&rhs.buf as *const B::Buf, &meta_b),
-                        (&mut self.buf as *mut B::Buf, &meta_a),
+                        (&self.buf as *const B::Buf<T>, &meta_a),
+                        (&rhs.buf as *const B::Buf<T>, &meta_b),
+                        (&mut self.buf as *mut B::Buf<T>, &meta_a),
                         OpType::Mul,
                     ).unwrap();
                 }
@@ -43,7 +43,7 @@ macro_rules! impl_mul_assign {
         impl<T, B> MulAssign<$rhs_type> for TensorBase<T, B>
         where
             T: TensorValue,
-            B: Backend<T>,
+            B: Backend,
         {
             fn mul_assign(&mut self, rhs: $rhs_type) {
                 let (out_shape, broadcast_stra, broadcast_strb) =
@@ -62,9 +62,9 @@ macro_rules! impl_mul_assign {
 
                 unsafe {
                     self.backend.broadcast(
-                        (&self.buf as *const B::Buf, &meta_a),
-                        (rhs.buf as *const B::Buf, &meta_b),
-                        (&mut self.buf as *mut B::Buf, &meta_a),
+                        (&self.buf as *const B::Buf<T>, &meta_a),
+                        (rhs.buf as *const B::Buf<T>, &meta_b),
+                        (&mut self.buf as *mut B::Buf<T>, &meta_a),
                         OpType::Mul,
                     ).unwrap();
                 }
@@ -76,7 +76,7 @@ macro_rules! impl_mul_assign {
         impl<'a, T, B> MulAssign<$rhs_type> for TensorViewMut<'a, T, B>
         where
             T: TensorValue,
-            B: Backend<T>,
+            B: Backend,
         {
             fn mul_assign(&mut self, rhs: $rhs_type) {
                 let (out_shape, broadcast_stra, broadcast_strb) =
@@ -95,9 +95,9 @@ macro_rules! impl_mul_assign {
 
                 unsafe {
                     self.backend.broadcast(
-                        (self.buf as *const B::Buf, &meta_a),
-                        (&rhs.buf as *const B::Buf, &meta_b),
-                        (self.buf as *mut B::Buf, &meta_a),
+                        (self.buf as *const B::Buf<T>, &meta_a),
+                        (&rhs.buf as *const B::Buf<T>, &meta_b),
+                        (self.buf as *mut B::Buf<T>, &meta_a),
                         OpType::Mul,
                     ).unwrap();
                 }
@@ -109,7 +109,7 @@ macro_rules! impl_mul_assign {
         impl<'a, T, B> MulAssign<$rhs_type> for TensorViewMut<'a, T, B>
         where
             T: TensorValue,
-            B: Backend<T>,
+            B: Backend,
         {
             fn mul_assign(&mut self, rhs: $rhs_type) {
                 let (out_shape, broadcast_stra, broadcast_strb) =
@@ -128,9 +128,9 @@ macro_rules! impl_mul_assign {
 
                 unsafe {
                     self.backend.broadcast(
-                        (self.buf as *const B::Buf, &meta_a),
-                        (rhs.buf as *const B::Buf, &meta_b),
-                        (self.buf as *mut B::Buf, &meta_a),
+                        (self.buf as *const B::Buf<T>, &meta_a),
+                        (rhs.buf as *const B::Buf<T>, &meta_b),
+                        (self.buf as *mut B::Buf<T>, &meta_a),
                         OpType::Mul,
                     ).unwrap();
                 }
@@ -146,7 +146,7 @@ macro_rules! impl_mul {
         impl<T, B> Mul<$rhs_type> for TensorBase<T, B>
         where
             T: TensorValue,
-            B: Backend<T>,
+            B: Backend,
         {
             type Output = TensorBase<T, B>;
 
@@ -161,9 +161,9 @@ macro_rules! impl_mul {
 
                 unsafe {
                     self.backend.broadcast(
-                        (&self.buf as *const B::Buf, &meta_a),
-                        (&rhs.buf as *const B::Buf, &meta_b),
-                        (&mut result.buf as *mut B::Buf, &result.meta),
+                        (&self.buf as *const B::Buf<T>, &meta_a),
+                        (&rhs.buf as *const B::Buf<T>, &meta_b),
+                        (&mut result.buf as *mut B::Buf<T>, &result.meta),
                         OpType::Mul,
                     ).unwrap();
                 }
@@ -176,7 +176,7 @@ macro_rules! impl_mul {
         impl<T, B> Mul<$rhs_type> for TensorBase<T, B>
         where
             T: TensorValue,
-            B: Backend<T>,
+            B: Backend,
         {
             type Output = TensorBase<T, B>;
 
@@ -191,9 +191,9 @@ macro_rules! impl_mul {
 
                 unsafe {
                     self.backend.broadcast(
-                        (&self.buf as *const B::Buf, &meta_a),
-                        (rhs.buf as *const B::Buf, &meta_b),
-                        (&mut result.buf as *mut B::Buf, &result.meta),
+                        (&self.buf as *const B::Buf<T>, &meta_a),
+                        (rhs.buf as *const B::Buf<T>, &meta_b),
+                        (&mut result.buf as *mut B::Buf<T>, &result.meta),
                         OpType::Mul,
                     ).unwrap();
                 }
@@ -206,7 +206,7 @@ macro_rules! impl_mul {
         impl<'a, T, B> Mul<$rhs_type> for $lhs_type<'a, T, B>
         where
             T: TensorValue,
-            B: Backend<T>,
+            B: Backend,
         {
             type Output = TensorBase<T, B>;
 
@@ -221,9 +221,9 @@ macro_rules! impl_mul {
 
                 unsafe {
                     self.backend.broadcast(
-                        (self.buf as *const B::Buf, &meta_a),
-                        (&rhs.buf as *const B::Buf, &meta_b),
-                        (&mut result.buf as *mut B::Buf, &result.meta),
+                        (self.buf as *const B::Buf<T>, &meta_a),
+                        (&rhs.buf as *const B::Buf<T>, &meta_b),
+                        (&mut result.buf as *mut B::Buf<T>, &result.meta),
                         OpType::Mul,
                     ).unwrap();
                 }
@@ -236,7 +236,7 @@ macro_rules! impl_mul {
         impl<'a, T, B> Mul<$rhs_type> for $lhs_type<'a, T, B>
         where
             T: TensorValue,
-            B: Backend<T>,
+            B: Backend,
         {
             type Output = TensorBase<T, B>;
 
@@ -251,9 +251,9 @@ macro_rules! impl_mul {
 
                 unsafe {
                     self.backend.broadcast(
-                        (self.buf as *const B::Buf, &meta_a),
-                        (rhs.buf as *const B::Buf, &meta_b),
-                        (&mut result.buf as *mut B::Buf, &result.meta),
+                        (self.buf as *const B::Buf<T>, &meta_a),
+                        (rhs.buf as *const B::Buf<T>, &meta_b),
+                        (&mut result.buf as *mut B::Buf<T>, &result.meta),
                         OpType::Mul,
                     ).unwrap();
                 }
@@ -266,7 +266,7 @@ macro_rules! impl_mul {
         impl<'a, T, B> Mul<$rhs_type> for &'a TensorBase<T, B>
         where
             T: TensorValue,
-            B: Backend<T>,
+            B: Backend,
         {
             type Output = TensorBase<T, B>;
 
@@ -281,9 +281,9 @@ macro_rules! impl_mul {
 
                 unsafe {
                     self.backend.broadcast(
-                        (&self.buf as *const B::Buf, &meta_a),
-                        (&rhs.buf as *const B::Buf, &meta_b),
-                        (&mut result.buf as *mut B::Buf, &result.meta),
+                        (&self.buf as *const B::Buf<T>, &meta_a),
+                        (&rhs.buf as *const B::Buf<T>, &meta_b),
+                        (&mut result.buf as *mut B::Buf<T>, &result.meta),
                         OpType::Mul,
                     ).unwrap();
                 }
@@ -296,7 +296,7 @@ macro_rules! impl_mul {
         impl<'a, T, B> Mul<$rhs_type> for &'a TensorBase<T, B>
         where
             T: TensorValue,
-            B: Backend<T>,
+            B: Backend,
         {
             type Output = TensorBase<T, B>;
 
@@ -311,9 +311,9 @@ macro_rules! impl_mul {
 
                 unsafe {
                     self.backend.broadcast(
-                        (&self.buf as *const B::Buf, &meta_a),
-                        (rhs.buf as *const B::Buf, &meta_b),
-                        (&mut result.buf as *mut B::Buf, &result.meta),
+                        (&self.buf as *const B::Buf<T>, &meta_a),
+                        (rhs.buf as *const B::Buf<T>, &meta_b),
+                        (&mut result.buf as *mut B::Buf<T>, &result.meta),
                         OpType::Mul,
                     ).unwrap();
                 }
@@ -326,7 +326,7 @@ macro_rules! impl_mul {
         impl<'a, 'b, T, B> Mul<$rhs_type> for &'a $lhs_type<'b, T, B>
         where
             T: TensorValue,
-            B: Backend<T>,
+            B: Backend,
         {
             type Output = TensorBase<T, B>;
 
@@ -341,9 +341,9 @@ macro_rules! impl_mul {
 
                 unsafe {
                     self.backend.broadcast(
-                        (self.buf as *const B::Buf, &meta_a),
-                        (&rhs.buf as *const B::Buf, &meta_b),
-                        (&mut result.buf as *mut B::Buf, &result.meta),
+                        (self.buf as *const B::Buf<T>, &meta_a),
+                        (&rhs.buf as *const B::Buf<T>, &meta_b),
+                        (&mut result.buf as *mut B::Buf<T>, &result.meta),
                         OpType::Mul,
                     ).unwrap();
                 }
@@ -356,7 +356,7 @@ macro_rules! impl_mul {
         impl<'a, 'b, T, B> Mul<$rhs_type> for &'a $lhs_type<'b, T, B>
         where
             T: TensorValue,
-            B: Backend<T>,
+            B: Backend,
         {
             type Output = TensorBase<T, B>;
 
@@ -371,9 +371,9 @@ macro_rules! impl_mul {
 
                 unsafe {
                     self.backend.broadcast(
-                        (self.buf as *const B::Buf, &meta_a),
-                        (rhs.buf as *const B::Buf, &meta_b),
-                        (&mut result.buf as *mut B::Buf, &result.meta),
+                        (self.buf as *const B::Buf<T>, &meta_a),
+                        (rhs.buf as *const B::Buf<T>, &meta_b),
+                        (&mut result.buf as *mut B::Buf<T>, &result.meta),
                         OpType::Mul,
                     ).unwrap();
                 }

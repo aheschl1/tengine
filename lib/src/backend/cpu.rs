@@ -5,18 +5,18 @@ use crate::backend::ContiguityTypes;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Cpu;
 
-impl<T: TensorValue> Backend<T> for Cpu {
-    type Buf = Box<[T]>;
+impl Backend for Cpu {
+    type Buf<T: TensorValue> = Box<[T]>;
 
 
     fn device_type() -> crate::core::primitives::DeviceType {
         crate::core::primitives::DeviceType::Cpu
     }
-    fn alloc(&self, len: usize) -> Result<Box<[T]>, TensorError> {
+    fn alloc<T: TensorValue>(&self, len: usize) -> Result<Box<[T]>, TensorError> {
         Ok(vec![T::default(); len].into())
     }
 
-    fn copy_from_slice(&self, dst: &mut Self::Buf, src: &[T]) -> Result<(), TensorError> {
+    fn copy_from_slice<T: TensorValue>(&self, dst: &mut Self::Buf<T>, src: &[T]) -> Result<(), TensorError> {
         if dst.len() != src.len() {
             return Err(TensorError::SizeMismatch(format!(
                 "Buffer size mismatch in copy_from_slice: dst size {}, src size {}",
@@ -28,7 +28,7 @@ impl<T: TensorValue> Backend<T> for Cpu {
         Ok(())
     }
 
-    fn read(&self, buf: &Self::Buf, offset: usize) -> Result<T, TensorError> {
+    fn read<T: TensorValue>(&self, buf: &Self::Buf<T>, offset: usize) -> Result<T, TensorError> {
         Ok(*buf.get(offset).ok_or(
             TensorError::IdxOutOfBounds(format!(
                 "Index {} out of bounds for buffer of length {}",
@@ -38,7 +38,7 @@ impl<T: TensorValue> Backend<T> for Cpu {
         )?)
     }
 
-    fn write(&self, buf: &mut Self::Buf, offset: usize, value: T) -> Result<(), TensorError> {
+    fn write<T: TensorValue>(&self, buf: &mut Self::Buf<T>, offset: usize, value: T) -> Result<(), TensorError> {
         match buf.get_mut(offset) {
             Some(slot) => {
                 *slot = value;
@@ -52,11 +52,11 @@ impl<T: TensorValue> Backend<T> for Cpu {
         }
     }
     
-    fn alloc_from_slice(&self, src: Box<[T]>) -> Result<Self::Buf, TensorError> {
+    fn alloc_from_slice<T: TensorValue>(&self, src: Box<[T]>) -> Result<Self::Buf<T>, TensorError> {
         Ok(src)
     }
     
-    fn len(&self, buf: &Self::Buf) -> usize {
+    fn len<T: TensorValue>(&self, buf: &Self::Buf<T>) -> usize {
         buf.len()
     }
     
@@ -64,19 +64,19 @@ impl<T: TensorValue> Backend<T> for Cpu {
         Self
     }
 
-    fn copy(&self, src: &Self::Buf) -> Result<Self::Buf, TensorError> {
+    fn copy<T: TensorValue>(&self, src: &Self::Buf<T>) -> Result<Self::Buf<T>, TensorError> {
         let mut dst = self.alloc(src.len())?;
         dst.copy_from_slice(src);
         Ok(dst)
     }
     
-    fn dump(&self, src: &Self::Buf) -> Result<Box<[T]>, TensorError> {
+    fn dump<T: TensorValue>(&self, src: &Self::Buf<T>) -> Result<Box<[T]>, TensorError> {
         Ok(src.clone())
     }
 
 
-        fn apply_elementwise_contiguous(
-        &self, buf: &mut Self::Buf, 
+    fn apply_elementwise_contiguous<T: TensorValue>(
+        &self, buf: &mut Self::Buf<T>, 
         op: (OpType, T), 
         start: usize,
         len: usize
@@ -88,8 +88,8 @@ impl<T: TensorValue> Backend<T> for Cpu {
         Ok(())
     }
     
-    fn apply_elementwise_1d_strided(
-        &self, buf: &mut Self::Buf, 
+    fn apply_elementwise_1d_strided<T: TensorValue>(
+        &self, buf: &mut Self::Buf<T>, 
         op: (OpType, T), 
         offset: usize,
         stride: isize,
@@ -104,9 +104,9 @@ impl<T: TensorValue> Backend<T> for Cpu {
         Ok(())
     }
     
-    fn apply_elementwise_nd(
+    fn apply_elementwise_nd<T: TensorValue>(
         &self,
-        buf: &mut Self::Buf,
+        buf: &mut Self::Buf<T>,
         op: (OpType, T),
         offset: usize,
         shape: &[usize],
@@ -124,11 +124,11 @@ impl<T: TensorValue> Backend<T> for Cpu {
         Ok(())
     }
 
-    unsafe fn broadcast(
+    unsafe fn broadcast<T: TensorValue>(
         &self, 
-        left: (*const Self::Buf, &MetaTensor), 
-        right: (*const Self::Buf, &MetaTensor),
-        dst: (*mut Self::Buf, &MetaTensor),
+        left: (*const Self::Buf<T>, &MetaTensor), 
+        right: (*const Self::Buf<T>, &MetaTensor),
+        dst: (*mut Self::Buf<T>, &MetaTensor),
         op: OpType
     ) -> Result<(), TensorError> {
         // this is a stupid algorithm which is O(rank*size)
@@ -193,18 +193,18 @@ macro_rules! blas_impl {
         impl BackendMatMul<$t> for Cpu {
             fn matmul(
                 &self,
-                lhs: (&Self::Buf, &MetaTensor),
-                rhs: (&Self::Buf, &MetaTensor),
+                lhs: (&Self::Buf<$t>, &MetaTensor),
+                rhs: (&Self::Buf<$t>, &MetaTensor),
                 b: usize,
                 m: usize,
                 k: usize,
                 n: usize,
                 contiguity: ContiguityTypes
-            ) -> Result<Self::Buf, TensorError> {
+            ) -> Result<Self::Buf<$t>, TensorError> {
 
                 let mut out_buf: Box<[$t]> = self.alloc(b * m * n)?;
-                let (lhs_buf, lhs_meta): (&Self::Buf, &MetaTensor) = lhs;
-                let (rhs_buf, rhs_meta): (&Self::Buf, &MetaTensor) = rhs;
+                let (lhs_buf, lhs_meta): (&Self::Buf<$t>, &MetaTensor) = lhs;
+                let (rhs_buf, rhs_meta): (&Self::Buf<$t>, &MetaTensor) = rhs;
                 let lda = match &contiguity {
                     ContiguityTypes::ColumnMajor => lhs_meta.strides()[lhs_meta.rank() - 1] as blasint,
                     ContiguityTypes::RowMajor => lhs_meta.strides()[lhs_meta.rank() - 2] as blasint,
@@ -294,17 +294,17 @@ macro_rules! generic_backend_matmul {
         impl BackendMatMul<$t> for Cpu {
             fn matmul(
                 &self,
-                lhs: (&Self::Buf, &MetaTensor),
-                rhs: (&Self::Buf, &MetaTensor),
+                lhs: (&Self::Buf<$t>, &MetaTensor),
+                rhs: (&Self::Buf<$t>, &MetaTensor),
                 b: usize,
                 m: usize,
                 k: usize,
                 n: usize,
                 contiguity: ContiguityTypes
-            ) -> Result<Self::Buf, TensorError> {
+            ) -> Result<Self::Buf<$t>, TensorError> {
                 let mut out_buf = self.alloc(b * m * n)?;
-                let (lhs_buf, lhs_meta): (&Self::Buf, &MetaTensor) = lhs;
-                let (rhs_buf, rhs_meta): (&Self::Buf, &MetaTensor) = rhs;
+                let (lhs_buf, lhs_meta): (&Self::Buf<$t>, &MetaTensor) = lhs;
+                let (rhs_buf, rhs_meta): (&Self::Buf<$t>, &MetaTensor) = rhs;
                 let lda = match contiguity {
                     ContiguityTypes::ColumnMajor => lhs_meta.strides[lhs_meta.rank() - 1] as usize,
                     ContiguityTypes::RowMajor => lhs_meta.strides[lhs_meta.rank() - 2] as usize,

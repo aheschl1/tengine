@@ -8,7 +8,7 @@ mod matmul;
 pub trait MatMul<Rhs, T, B> 
 where 
     T: TensorValue,
-    B: Backend<T>,
+    B: Backend,
 {
     /// Performs matrix multiplication.
     /// 
