@@ -44,6 +44,13 @@ impl From<DType> for crate::core::value::DType {
     }
 }
 
+impl From<i32> for crate::core::value::DType {
+    fn from(dtype: i32) -> Self {
+        DType::try_from(dtype).unwrap().into()
+    }
+}
+
+
 impl From<crate::ops::base::OpType> for OpType {
     fn from(op: crate::ops::base::OpType) -> Self {
         match op {

@@ -3,7 +3,7 @@ use std::net::IpAddr;
 
 use crate::backend::Backend;
 use crate::backend::cpu::Cpu;
-use crate::core::value::TensorValue;
+use crate::core::value::{DType, TensorValue};
 use crate::core::{shape_to_stride, Shape, MetaTensor};
 use crate::core::tensor::TensorError;
 

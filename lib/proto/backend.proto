@@ -36,7 +36,7 @@ message MetaTensor {
 }
 
 message RemoteBuf {
-  uint64 tensor_id = 1;
+  uint32 tensor_id = 1;
   DType dtype = 2;
 }
 

@@ -1,4 +1,6 @@
-use std::{net::{IpAddr, TcpStream}, sync::{atomic::AtomicBool, Arc}};
+use std::{io::{Read, Write}, net::{IpAddr, TcpStream}, sync::{atomic::AtomicBool, Arc, Mutex}};
+
+use prost::Message;
 
 use crate::{backend::{remote::{protocol, TensorId}, Backend, BackendMatMul}, core::{meta::ContiguityTypes, primitives::DeviceType, tensor::TensorError, value::TensorValue, MetaTensor}};
 
@@ -29,7 +31,7 @@ impl<T: TensorValue> From<&mut RemoteBuf<T>> for Option<protocol::RemoteBuf> {
 pub struct RemoteBackend {
     pub address: IpAddr,
     pub port: u16,
-    stream: Option<TcpStream>
+    stream: Option<Mutex<TcpStream>>
 }
 
 impl RemoteBackend {
@@ -42,9 +44,38 @@ impl RemoteBackend {
     }
 
     pub fn connect(&mut self) -> Result<(), std::io::Error> {
+        tracing::debug!("Attempting TCP connection to {}:{}", self.address, self.port);
         let stream = TcpStream::connect((self.address, self.port))?;
-        self.stream = Some(stream);
+        tracing::info!("TCP connection established to {}:{}", self.address, self.port);
+        self.stream = Some(Mutex::new(stream));
         Ok(())
+    }
+
+    pub fn send_message(&self, message: protocol::BackendRequest) -> Result<protocol::BackendResponse, std::io::Error> {
+        tracing::debug!("Sending message: {:?}", message.request);
+        let stream = self.stream.as_ref().ok_or(std::io::Error::new(std::io::ErrorKind::NotConnected, "Not connected"))?;
+        let bytes = message.encode_to_vec();
+        let size = (bytes.len() as u32).to_le_bytes();
+
+        tracing::debug!("Encoded message size: {} bytes", bytes.len());
+        let mut stream = stream.lock().unwrap();
+        stream.write_all(&size)?;
+        stream.write_all(&bytes)?;
+        tracing::debug!("Message sent, waiting for response");
+
+        let mut size_buf = [0u8; 4];
+        stream.read_exact(&mut size_buf)?;
+        let size = u32::from_le_bytes(size_buf) as usize;
+        tracing::debug!("Response size: {} bytes", size);
+        
+        let mut resp_buf = vec![0u8; size];
+        stream.read_exact(&mut resp_buf)?;
+        tracing::debug!("Response received");
+
+        let response = protocol::BackendResponse::decode(&resp_buf[..])
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        tracing::debug!("Response decoded successfully");
+        Ok(response)
     }
 }
 
@@ -69,22 +100,66 @@ impl Backend for RemoteBackend {
                 vect.len() * std::mem::size_of::<T>(),
             ).to_vec()
         };
-        let _request = protocol::AllocFromSliceRequest {
+        let request = protocol::AllocFromSliceRequest {
             dtype: Into::<protocol::DType>::into(T::DTYPE) as i32,
             data: vecbytes,
         };
-
-        todo!()
+        let response = self.send_message(protocol::BackendRequest {
+            request: Some(protocol::backend_request::Request::AllocFromSlice(request)),
+            request_id: 0,
+        }).map_err(|e| crate::core::tensor::TensorError::BackendError(e.to_string()))?;
+        match response.response.unwrap() {
+            protocol::backend_response::Response::Alloc(alloc_response) => {
+                if alloc_response.success {
+                    let new_buf = alloc_response.new_buf.ok_or(crate::core::tensor::TensorError::BackendError("Missing buffer in response".to_string()))?;
+                    Ok(RemoteBuf {
+                        id: new_buf.tensor_id,
+                        dirty: Arc::new(AtomicBool::new(false)),
+                        _phantom: std::marker::PhantomData,
+                    })
+                } else {
+                    Err(crate::core::tensor::TensorError::BackendError(alloc_response.error))
+                }
+            },
+            _ => Err(crate::core::tensor::TensorError::BackendError("Unexpected response type".to_string())),
+        }
     }
 
     fn alloc<T: TensorValue>(&self, len: usize) -> Result<Self::Buf<T>, crate::core::tensor::TensorError> {
+        tracing::debug!("Client alloc: requesting buffer of {} elements of type {:?}", len, T::DTYPE);
         let pdtyppe: protocol::DType = T::DTYPE.into();
         let _request = protocol::AllocRequest {
             dtype: pdtyppe as i32,
             len: len as u64,
         };
 
-        todo!()
+        tracing::debug!("Sending alloc request");
+        let response = self.send_message(protocol::BackendRequest {
+            request: Some(protocol::backend_request::Request::Alloc(_request)),
+            request_id: 0,
+        }).map_err(|e| crate::core::tensor::TensorError::BackendError(e.to_string()))?;
+
+        tracing::debug!("Received alloc response");
+        match response.response.unwrap() {
+            protocol::backend_response::Response::Alloc(alloc_response) => {
+                if alloc_response.success {
+                    let new_buf = alloc_response.new_buf.ok_or(crate::core::tensor::TensorError::BackendError("Missing buffer in response".to_string()))?;
+                    tracing::info!("Successfully allocated remote buffer with id={}", new_buf.tensor_id);
+                    Ok(RemoteBuf {
+                        id: new_buf.tensor_id,
+                        dirty: Arc::new(AtomicBool::new(false)),
+                        _phantom: std::marker::PhantomData,
+                    })
+                } else {
+                    tracing::error!("Alloc failed: {}", alloc_response.error);
+                    Err(crate::core::tensor::TensorError::BackendError(alloc_response.error))
+                }
+            },
+            _ => {
+                tracing::error!("Unexpected response type");
+                Err(crate::core::tensor::TensorError::BackendError("Unexpected response type".to_string()))
+            },
+        }
     }
 
     fn copy_from_slice<T: TensorValue>(&self, dst: &mut Self::Buf<T>, src: &[T]) -> Result<(), crate::core::tensor::TensorError> {
@@ -103,12 +178,71 @@ impl Backend for RemoteBackend {
     }
 
     fn read<T: TensorValue>(&self, buf: &Self::Buf<T>, offset: usize) -> Result<T, crate::core::tensor::TensorError> {
+        tracing::debug!("Client read: tensor_id={}, offset={}, dtype={:?}", buf.id, offset, T::DTYPE);
         let _request = protocol::ReadRequest {
             buf: buf.into(),
             offset: offset as u64,
         };
 
-        todo!()
+        tracing::debug!("Sending read request");
+        let response = self.send_message(protocol::BackendRequest {
+            request: Some(protocol::backend_request::Request::Read(_request)),
+            request_id: 0,
+        }).map_err(|e| crate::core::tensor::TensorError::BackendError(e.to_string()))?;
+
+        tracing::debug!("Received read response");
+        match response.response.unwrap() {
+            protocol::backend_response::Response::Read(read_response) => {
+                if read_response.success {
+                    let tensor_value = read_response.value.ok_or(
+                        crate::core::tensor::TensorError::BackendError("Missing value in response".to_string())
+                    )?;
+                    
+                    // Extract bytes from TensorValue based on dtype
+                    let bytes = match tensor_value.value.ok_or(
+                        crate::core::tensor::TensorError::BackendError("Missing value field in TensorValue".to_string())
+                    )? {
+                        protocol::tensor_value::Value::U8Value(b) => b,
+                        protocol::tensor_value::Value::U16Value(b) => b,
+                        protocol::tensor_value::Value::U32Value(b) => b,
+                        protocol::tensor_value::Value::U64Value(b) => b,
+                        protocol::tensor_value::Value::U128Value(b) => b,
+                        protocol::tensor_value::Value::I8Value(b) => b,
+                        protocol::tensor_value::Value::I16Value(b) => b,
+                        protocol::tensor_value::Value::I32Value(b) => b,
+                        protocol::tensor_value::Value::I64Value(b) => b,
+                        protocol::tensor_value::Value::I128Value(b) => b,
+                        protocol::tensor_value::Value::F32Value(b) => b,
+                        protocol::tensor_value::Value::F64Value(b) => b,
+                        protocol::tensor_value::Value::IsizeValue(b) => b,
+                        protocol::tensor_value::Value::UsizeValue(b) => b,
+                        protocol::tensor_value::Value::BoolValue(b) => b,
+                    };
+
+                    // Convert bytes back to T
+                    if bytes.len() != std::mem::size_of::<T>() {
+                        return Err(crate::core::tensor::TensorError::BackendError(
+                            format!("Received {} bytes but expected {} for type {:?}", 
+                                bytes.len(), std::mem::size_of::<T>(), T::DTYPE)
+                        ));
+                    }
+
+                    let value = unsafe {
+                        std::ptr::read(bytes.as_ptr() as *const T)
+                    };
+                    
+                    tracing::debug!("Successfully read value at offset {}", offset);
+                    Ok(value)
+                } else {
+                    tracing::error!("Read failed: {}", read_response.error);
+                    Err(crate::core::tensor::TensorError::BackendError(read_response.error))
+                }
+            },
+            _ => {
+                tracing::error!("Unexpected response type");
+                Err(crate::core::tensor::TensorError::BackendError("Unexpected response type".to_string()))
+            },
+        }
     }
 
     fn write<T: TensorValue>(&self, buf: &mut Self::Buf<T>, offset: usize, value: T) -> Result<(), crate::core::tensor::TensorError> {
@@ -125,7 +259,11 @@ impl Backend for RemoteBackend {
             value: Some(protocol::TensorValue::from_bytes_and_dtype(valuebytes, dtype)),
         };
 
-        todo!()
+        self.send_message(protocol::BackendRequest {
+            request: Some(protocol::backend_request::Request::Write(_request)),
+            request_id: 0,
+        }).map_err(|e| crate::core::tensor::TensorError::BackendError(e.to_string()))?;
+        Ok(())
     }
 
     fn len<T: TensorValue>(&self, buf: &Self::Buf<T>) -> usize {

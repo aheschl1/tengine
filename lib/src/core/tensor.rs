@@ -33,6 +33,10 @@ pub enum TensorError {
     #[cfg(feature = "cuda")]
     #[error("cuda error: {0}")]
     CudaError(String),
+
+    #[cfg(feature = "remote")]
+    #[error("connection not open: {0}")]
+    RemoteError(String),
 }
 
 /// Provides immutable view access to tensor data.

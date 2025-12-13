@@ -13,6 +13,10 @@ cudarc = { version = "0.18.1", features = ["cuda-13000"], optional = true }
 thiserror = "2.0.17"
 prost = "0.13"
 bytes = "1.9"
+tracing = {version = "0.1", features = ["release_max_level_info"]}
+
+[dev-dependencies]
+tracing-subscriber = "0.3"
 
 [build-dependencies]
 cc = "1.0.82"
