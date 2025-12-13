@@ -1,12 +1,12 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{backend::remote::client::RemoteBuf, core::{meta::ContiguityTypes, primitives::DeviceType, tensor::TensorError, value::{DType, TensorValue}, MetaTensor}, ops::base::OpType};
+use crate::{backend::remote::client::RemoteBuf, core::{meta::ContiguityTypes, primitives::DeviceType, tensor::TensorError, untyped::UntypedTensor, value::{DType, TensorValue}, MetaTensor}, ops::base::OpType};
 
 
 #[derive(Serialize, Deserialize)]
 pub(crate) struct Slice {
-    data: Vec<u8>, // bytes
-    dtype: DType,
+    pub(crate) data: Vec<u8>, // bytes
+    pub(crate) dtype: DType,
 }
 
 impl Slice {
@@ -106,7 +106,7 @@ pub(crate) struct Response {
 
 #[derive(Serialize, Deserialize)]
 pub(crate) struct Request {
-    pub(crate) message_id: u32,
+    pub(crate) task_id: u32,
     pub(crate) message: Messages,
 }
 

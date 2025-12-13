@@ -112,7 +112,7 @@ impl RemoteBackend {
         }
         self.pending.inc();
         let req = Request {
-            message_id: mid,
+            task_id: mid,
             message: msg,
         };
         self.outgoing.enqueue(req);
