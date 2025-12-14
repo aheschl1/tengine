@@ -197,7 +197,7 @@ impl<'a, T: TensorValue, B: Backend> AsTensor<T, B> for TensorViewMut<'a, T, B> 
 #[inline]
 fn view_to_contiguous<T: TensorValue, B: Backend>(meta: &MetaTensor, raw: &B::Buf<T>, backend: &B) -> Result<TensorBase<T, B>, TensorError> {
     let size = meta.size();
-    let new_backend = B::new();
+    let new_backend = backend.clone();
     let mut new_buf = new_backend.alloc(size)?;
     
     // Copy element by element from the view to the new contiguous buffer

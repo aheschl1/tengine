@@ -133,7 +133,7 @@ where
         )?;
 
         Ok(TensorBase::from_parts(
-            B::new(),
+            lhs_view.backend.clone(),
             buf,
             MetaTensor::new(out_shape, out_strides, 0),
         ))

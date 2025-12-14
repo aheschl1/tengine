@@ -11,7 +11,7 @@ pub mod cuda_tests;
 #[cfg(feature = "remote")]
 pub mod remote;
 
-pub trait Backend: Send + Sync + 'static {
+pub trait Backend: Send + Sync + 'static + Clone {
     type Buf<T: TensorValue>: Send + Sync;
 
     fn device_type() -> crate::core::primitives::DeviceType;

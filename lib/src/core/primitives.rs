@@ -1,4 +1,6 @@
 use std::marker::PhantomData;
+#[cfg(feature = "remote")]
+use std::net::IpAddr;
 
 
 use crate::backend::Backend;
@@ -21,7 +23,7 @@ pub struct TensorBase<T: TensorValue, B: Backend> {
 
 impl<B: Backend, T: TensorValue> Clone for TensorBase<T, B> {
     fn clone(&self) -> Self {
-        let new_backend = B::new();
+        let new_backend = self.backend.clone();
         let new_buffer = new_backend.copy(&self.buf).unwrap();
         Self {
             backend: new_backend,
