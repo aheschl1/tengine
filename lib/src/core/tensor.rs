@@ -3,8 +3,12 @@ use crate::{backend::Backend, core::{idx::Idx, meta::is_contiguous_relaxed, prim
 use super::slice::{Slice, compute_sliced_parameters};
 use thiserror::Error;
 
+#[cfg(feature = "remote")]
+use serde::{Deserialize, Serialize};
+
 /// Errors that can occur during tensor operations.
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
+#[cfg_attr(feature = "remote", derive(Serialize, Deserialize))]
 pub enum TensorError {
     #[error("index out of bounds {0}")]
     IdxOutOfBounds(String),
@@ -33,10 +37,14 @@ pub enum TensorError {
     #[cfg(feature = "cuda")]
     #[error("cuda error: {0}")]
     CudaError(String),
+
+    #[cfg(feature = "remote")]
+    #[error("connection not open: {0}")]
+    RemoteError(String),
 }
 
 /// Provides immutable view access to tensor data.
-pub trait AsView<T: TensorValue, B: Backend<T>> {
+pub trait AsView<T: TensorValue, B: Backend> {
     /// Returns the device type where this tensor resides.
     fn device(&self) -> DeviceType {
         B::device_type()
@@ -52,7 +60,7 @@ pub trait AsView<T: TensorValue, B: Backend<T>> {
 }
 
 /// Provides mutable view access to tensor data.
-pub trait AsViewMut<T: TensorValue, B: Backend<T>> : AsView<T, B> {
+pub trait AsViewMut<T: TensorValue, B: Backend> : AsView<T, B> {
     /// Returns a mutable view over the tensor data, sharing the same
     /// underlying buffer and metadata (shape/stride/offset) without copying.
     fn view_mut(&'_ mut self) -> TensorViewMut<'_, T, B>;
@@ -63,7 +71,7 @@ pub trait AsViewMut<T: TensorValue, B: Backend<T>> : AsView<T, B> {
 }
 
 /// Converts tensor views or references to owned tensors.
-pub trait AsTensor<T: TensorValue, B: Backend<T>> {
+pub trait AsTensor<T: TensorValue, B: Backend> {
     /// Converts to an owned tensor, copying data if necessary.
     fn owned(&self) -> TensorBase<T, B>;
     
@@ -71,7 +79,7 @@ pub trait AsTensor<T: TensorValue, B: Backend<T>> {
     fn contiguous(&self) -> TensorBase<T, B>;
 }
 
-impl<T: TensorValue, B: Backend<T>> AsView<T, B> for TensorBase<T, B> {
+impl<T: TensorValue, B: Backend> AsView<T, B> for TensorBase<T, B> {
     fn view(&self) -> TensorView<'_, T, B> {
         TensorView::<T, B>::from_parts(
             &self.buf, 
@@ -90,7 +98,7 @@ impl<T: TensorValue, B: Backend<T>> AsView<T, B> for TensorBase<T, B> {
     }
 } 
 
-impl<T: TensorValue, B: Backend<T>> AsViewMut<T, B> for TensorBase<T, B> {
+impl<T: TensorValue, B: Backend> AsViewMut<T, B> for TensorBase<T, B> {
     fn view_mut(&'_ mut self) -> TensorViewMut<'_, T, B> {
         TensorViewMut::<T, B>::from_parts(
             &mut self.buf, 
@@ -104,7 +112,7 @@ impl<T: TensorValue, B: Backend<T>> AsViewMut<T, B> for TensorBase<T, B> {
     }
 }
 
-impl<T: TensorValue, B: Backend<T>> AsView<T, B> for TensorView<'_, T, B> 
+impl<T: TensorValue, B: Backend> AsView<T, B> for TensorView<'_, T, B> 
 {
     fn view(&self) -> TensorView<'_, T, B> {
         TensorView::from_parts(
@@ -120,7 +128,7 @@ impl<T: TensorValue, B: Backend<T>> AsView<T, B> for TensorView<'_, T, B>
 
 }
 
-impl<T: TensorValue, B: Backend<T>> AsView<T, B> for TensorViewMut<'_, T, B> 
+impl<T: TensorValue, B: Backend> AsView<T, B> for TensorViewMut<'_, T, B> 
 {
     fn view(&self) -> TensorView<'_, T, B> {
         TensorView::from_parts(
@@ -135,7 +143,7 @@ impl<T: TensorValue, B: Backend<T>> AsView<T, B> for TensorViewMut<'_, T, B>
     }
 }
 
-impl<T: TensorValue, B: Backend<T>> AsViewMut<T, B> for TensorViewMut<'_, T, B> 
+impl<T: TensorValue, B: Backend> AsViewMut<T, B> for TensorViewMut<'_, T, B> 
 {
     fn view_mut(&'_ mut self) -> TensorViewMut<'_, T, B> {
         TensorViewMut::from_parts(
@@ -151,7 +159,7 @@ impl<T: TensorValue, B: Backend<T>> AsViewMut<T, B> for TensorViewMut<'_, T, B>
 }
 
 
-impl <T: TensorValue, B: Backend<T>> AsTensor<T, B> for TensorBase<T, B> {
+impl <T: TensorValue, B: Backend> AsTensor<T, B> for TensorBase<T, B> {
     fn owned(&self) -> TensorBase<T, B> {
         self.clone()
     }
@@ -166,7 +174,7 @@ impl <T: TensorValue, B: Backend<T>> AsTensor<T, B> for TensorBase<T, B> {
     }
 }
 
-impl<'a, T: TensorValue, B: Backend<T>> AsTensor<T, B> for TensorView<'a, T, B> {
+impl<'a, T: TensorValue, B: Backend> AsTensor<T, B> for TensorView<'a, T, B> {
     fn owned(&self) -> TensorBase<T, B> {
         view_to_contiguous(&self.meta, self.buf, self.backend).unwrap()
     }
@@ -176,7 +184,7 @@ impl<'a, T: TensorValue, B: Backend<T>> AsTensor<T, B> for TensorView<'a, T, B> 
     }
 }
 
-impl<'a, T: TensorValue, B: Backend<T>> AsTensor<T, B> for TensorViewMut<'a, T, B> {
+impl<'a, T: TensorValue, B: Backend> AsTensor<T, B> for TensorViewMut<'a, T, B> {
     fn owned(&self) -> TensorBase<T, B> {
         view_to_contiguous(&self.meta, self.buf, self.backend).unwrap()
     }
@@ -187,9 +195,9 @@ impl<'a, T: TensorValue, B: Backend<T>> AsTensor<T, B> for TensorViewMut<'a, T, 
 }
 
 #[inline]
-fn view_to_contiguous<T: TensorValue, B: Backend<T>>(meta: &MetaTensor, raw: &B::Buf, backend: &B) -> Result<TensorBase<T, B>, TensorError> {
+fn view_to_contiguous<T: TensorValue, B: Backend>(meta: &MetaTensor, raw: &B::Buf<T>, backend: &B) -> Result<TensorBase<T, B>, TensorError> {
     let size = meta.size();
-    let new_backend = B::new();
+    let new_backend = backend.clone();
     let mut new_buf = new_backend.alloc(size)?;
     
     // Copy element by element from the view to the new contiguous buffer
@@ -209,7 +217,7 @@ fn view_to_contiguous<T: TensorValue, B: Backend<T>>(meta: &MetaTensor, raw: &B:
 }
 
 /// Provides read access to tensor elements and slicing operations.
-pub trait TensorAccess<T: TensorValue, B: Backend<T>>: Sized {
+pub trait TensorAccess<T: TensorValue, B: Backend>: Sized {
     /// Get element at given index.
     /// 
     /// # Examples
@@ -265,7 +273,7 @@ pub trait TensorAccess<T: TensorValue, B: Backend<T>>: Sized {
 }
 
 /// Provides mutable access to tensor elements and slicing operations.
-pub trait TensorAccessMut<T: TensorValue, B: Backend<T>>: TensorAccess<T, B> {
+pub trait TensorAccessMut<T: TensorValue, B: Backend>: TensorAccess<T, B> {
     /// Create a mutable slice/view of the tensor along a specific dimension.
     fn slice_mut<S: Into<Slice>>(&mut self, dim: Dim, idx: S) -> Result<TensorViewMut<'_, T, B>, TensorError> where Self: Sized;
     
@@ -304,8 +312,8 @@ pub trait TensorAccessMut<T: TensorValue, B: Backend<T>>: TensorAccess<T, B> {
     fn squeeze_mut(&mut self) -> TensorViewMut<'_, T, B>;
 }
 
-impl<T: TensorValue, B: Backend<T>, V> TensorAccess<T, B> for V
-where B: Backend<T>, V: AsView<T, B>
+impl<T: TensorValue, B: Backend, V> TensorAccess<T, B> for V
+where B: Backend, V: AsView<T, B>
 {
     /// Returns a reference to the element at a logical index, converting
     /// coordinates into a buffer position via stride and offset.
@@ -394,7 +402,7 @@ where B: Backend<T>, V: AsView<T, B>
     }
 }
 
-impl<T: TensorValue, B: Backend<T>, V> TensorAccessMut<T, B> for V
+impl<T: TensorValue, B: Backend, V> TensorAccessMut<T, B> for V
 where V: AsViewMut<T, B>
 {
     /// Creates a new mutable view by fixing `dim` to `idx`, effectively

@@ -4,7 +4,7 @@ use crate::{backend::Backend, core::{primitives::TensorBase, tensor::AsTensor, v
 
 impl<'a, T, B> SubAssign<T> for TensorViewMut<'a, T, B> 
     where T: TensorValue,
-          B: Backend<T>,
+          B: Backend,
 {
     fn sub_assign(&mut self, rhs: T) {
         self.backend.apply_elementwise(
@@ -17,7 +17,7 @@ impl<'a, T, B> SubAssign<T> for TensorViewMut<'a, T, B>
 
 impl<'a, T, B> SubAssign<&T> for TensorViewMut<'a, T, B> 
     where T: TensorValue,
-          B: Backend<T>,
+          B: Backend,
 {
     fn sub_assign(&mut self, rhs: &T) {
         self.backend.apply_elementwise(
@@ -30,7 +30,7 @@ impl<'a, T, B> SubAssign<&T> for TensorViewMut<'a, T, B>
 
 impl<T, B> SubAssign<T> for TensorBase<T, B> 
     where T: TensorValue,
-          B: Backend<T>,
+          B: Backend,
 {
     fn sub_assign(&mut self, rhs: T) {
         self.backend.apply_elementwise(
@@ -43,7 +43,7 @@ impl<T, B> SubAssign<T> for TensorBase<T, B>
 
 impl<T, B> SubAssign<&T> for TensorBase<T, B> 
     where T: TensorValue,
-          B: Backend<T>,
+          B: Backend,
 {
     fn sub_assign(&mut self, rhs: &T) {
         self.backend.apply_elementwise(
@@ -59,7 +59,7 @@ macro_rules! impl_sub {
         impl<'a, T, B> Sub<T> for $type
         where
             T: TensorValue,
-            B: Backend<T>,
+            B: Backend,
         {
             type Output = TensorBase<T, B>;
 
@@ -73,7 +73,7 @@ macro_rules! impl_sub {
         impl<'a, T, B> Sub<&T> for $type
         where
             T: TensorValue,
-            B: Backend<T>,
+            B: Backend,
         {
             type Output = TensorBase<T, B>;
 

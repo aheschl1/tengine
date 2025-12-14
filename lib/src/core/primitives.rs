@@ -1,4 +1,7 @@
 use std::marker::PhantomData;
+#[cfg(feature = "remote")]
+use std::net::IpAddr;
+
 
 use crate::backend::Backend;
 use crate::backend::cpu::Cpu;
@@ -11,16 +14,16 @@ use crate::core::tensor::TensorError;
 /// This is the base type for all tensors, parameterized by element type `T` and backend `B`.
 /// Most users will use type aliases like `Tensor<T>` (CPU) or `CudaTensor<T>` (GPU).
 #[derive(Debug, PartialEq, Eq)]
-pub struct TensorBase<T: TensorValue, B: Backend<T>> {
+pub struct TensorBase<T: TensorValue, B: Backend> {
     pub(crate) backend: B,
-    pub(crate) buf: B::Buf,
+    pub(crate) buf: B::Buf<T>,
     pub(crate) meta: MetaTensor,
     _t: PhantomData<T>,
 }
 
-impl<B: Backend<T>, T: TensorValue> Clone for TensorBase<T, B> {
+impl<B: Backend, T: TensorValue> Clone for TensorBase<T, B> {
     fn clone(&self) -> Self {
-        let new_backend = B::new();
+        let new_backend = self.backend.clone();
         let new_buffer = new_backend.copy(&self.buf).unwrap();
         Self {
             backend: new_backend,
@@ -40,6 +43,12 @@ impl<B: Backend<T>, T: TensorValue> Clone for TensorBase<T, B> {
 /// let tensor = Tensor::<i32>::from_buf(vec![1, 2, 3, 4], (2, 2)).unwrap();
 /// ```
 pub type Tensor<T> = TensorBase<T, Cpu>;
+
+#[cfg(feature = "remote")]
+use crate::backend::remote::client::RemoteBackend;
+
+#[cfg(feature = "remote")]
+pub type RemoteTensor<T> = TensorBase<T, RemoteBackend>;
 
 #[cfg(feature = "cuda")]
 /// An owned GPU tensor stored on CUDA device.
@@ -67,6 +76,29 @@ impl<T: TensorValue> Tensor<T> {
     }
 }
 
+#[cfg(feature = "remote")]
+impl<T: TensorValue> RemoteTensor<T> {
+    /// Transfers this tensor from remote backend to CPU memory.
+    pub fn cpu(&self) -> Result<Tensor<T>, TensorError> {
+        let cpu_backend = Cpu;
+        let cpu_buffer = self.backend.dump(&self.buf)?;
+        let cpu = Tensor::from_parts(cpu_backend, cpu_buffer, self.meta.clone());
+        Ok(cpu)
+    }
+
+    pub fn with_remote(ip: IpAddr, port: u16) -> Result<Self, TensorError> {
+        let remote_backend = RemoteBackend::new_with_address(ip, port)
+            .map_err(|e| TensorError::RemoteError(format!("Failed to create remote backend: {}", e)))?;
+        let buf = remote_backend.alloc::<T>(0)?;
+        Ok(Self {
+            backend: remote_backend,
+            buf: buf,
+            meta: MetaTensor::new(vec![], vec![], 0),
+            _t: PhantomData,
+        })
+    }
+}
+
 /// A non-owning immutable view over tensor data.
 /// 
 /// Views share the underlying buffer with the source tensor and have their own
@@ -74,9 +106,9 @@ impl<T: TensorValue> Tensor<T> {
 pub struct TensorView<'a, T, B>
 where
     T: TensorValue,
-    B: Backend<T> + 'a,
+    B: Backend + 'a,
 {
-    pub(crate) buf: &'a B::Buf,
+    pub(crate) buf: &'a B::Buf<T>,
     pub(crate) backend: &'a B,
     pub(crate) meta: MetaTensor,
 }
@@ -87,9 +119,9 @@ where
 pub struct TensorViewMut<'a, T, B>
 where
     T: TensorValue,
-    B: Backend<T> + 'a,
+    B: Backend + 'a,
 {
-    pub(crate) buf: &'a mut B::Buf,
+    pub(crate) buf: &'a mut B::Buf<T>,
     pub(crate) backend: &'a B,
     pub(crate) meta: MetaTensor,
 }
@@ -97,12 +129,12 @@ where
 impl<'a, T, B> TensorView<'a, T, B>
 where
     T: TensorValue,
-    B: Backend<T> + 'a,
+    B: Backend + 'a,
 {
     /// Builds a tensor view from raw storage and metadata. No copying occurs;
     /// caller guarantees that `meta` correctly describes the layout within `raw`.
     pub(crate) fn from_parts(
-        buf: &'a B::Buf,
+        buf: &'a B::Buf<T>,
         backend: &'a B,
         meta: MetaTensor
     ) -> Self {
@@ -117,12 +149,12 @@ where
 impl<'a, T, B> TensorViewMut<'a, T, B>
 where
     T: TensorValue,
-    B: Backend<T> + 'a,
+    B: Backend + 'a,
 {
     /// Builds a tensor view from raw storage and metadata. No copying occurs;
     /// caller guarantees that `meta` correctly describes the layout within `raw`.
     pub(crate) fn from_parts(
-        raw: &'a mut B::Buf,
+        raw: &'a mut B::Buf<T>,
         backend: &'a B,
         meta: MetaTensor
     ) -> Self {
@@ -141,13 +173,18 @@ pub type CudaTensorView<'a, T> = TensorView<'a, T, crate::backend::cuda::Cuda>;
 #[cfg(feature = "cuda")]
 pub type CudaTensorViewMut<'a, T> = TensorViewMut<'a, T, crate::backend::cuda::Cuda>;
 
+#[cfg(feature = "remote")]
+pub type RemoteTensorView<'a, T> = TensorView<'a, T, RemoteBackend>;
+#[cfg(feature = "remote")]
+pub type RemoteTensorViewMut<'a, T> = TensorViewMut<'a, T, RemoteBackend>;
+
 impl<B, T: TensorValue> TensorBase<T, B> 
 where 
-    B: Backend<T>,
+    B: Backend,
 {
     /// Internal constructor from raw parts. Used for creating tensors from
     /// existing backend buffers without copying.
-    pub(crate) fn from_parts(backend: B, raw: B::Buf, meta: MetaTensor) -> Self {
+    pub(crate) fn from_parts(backend: B, raw: B::Buf<T>, meta: MetaTensor) -> Self {
         Self {
             backend,
             buf: raw,
@@ -285,12 +322,20 @@ where
 
 }
 
+#[cfg(feature = "remote")]
+use serde::{Deserialize, Serialize};
+
 /// Indicates where a tensor's data resides.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "remote", derive(Serialize, Deserialize))]
 pub enum DeviceType {
-    /// CPU memory
     Cpu,
     #[cfg(feature = "cuda")]
-    /// CUDA device memory (GPU), with device index
     Cuda(usize),
+    #[cfg(feature = "remote")]
+    Remote {
+        ip: IpAddr,
+        port: u16,
+        remote_type: Box<DeviceType>
+    }
 }

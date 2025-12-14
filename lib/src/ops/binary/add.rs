@@ -10,7 +10,7 @@ macro_rules! impl_add_assign {
         impl<T, B> AddAssign<$rhs_type> for TensorBase<T, B>
         where
             T: TensorValue,
-            B: Backend<T>,
+            B: Backend,
         {
             fn add_assign(&mut self, rhs: $rhs_type) {
                 let (out_shape, broadcast_stra, broadcast_strb) =
@@ -29,9 +29,9 @@ macro_rules! impl_add_assign {
 
                 unsafe {
                     self.backend.broadcast(
-                        (&self.buf as *const B::Buf, &meta_a),
-                        (&rhs.buf as *const B::Buf, &meta_b),
-                        (&mut self.buf as *mut B::Buf, &meta_a),
+                        (&self.buf as *const B::Buf<T>, &meta_a),
+                        (&rhs.buf as *const B::Buf<T>, &meta_b),
+                        (&mut self.buf as *mut B::Buf<T>, &meta_a),
                         OpType::Add,
                     ).unwrap();
                 }
@@ -43,7 +43,7 @@ macro_rules! impl_add_assign {
         impl<T, B> AddAssign<$rhs_type> for TensorBase<T, B>
         where
             T: TensorValue,
-            B: Backend<T>,
+            B: Backend,
         {
             fn add_assign(&mut self, rhs: $rhs_type) {
                 let (out_shape, broadcast_stra, broadcast_strb) =
@@ -61,9 +61,9 @@ macro_rules! impl_add_assign {
                 let meta_b = MetaTensor::new(out_shape.clone(), broadcast_strb, rhs.offset());
                 unsafe {
                     self.backend.broadcast(
-                        (&self.buf as *const B::Buf, &meta_a),
-                        (rhs.buf as *const B::Buf, &meta_b),
-                        (&mut self.buf as *mut B::Buf, &meta_a),
+                        (&self.buf as *const B::Buf<T>, &meta_a),
+                        (rhs.buf as *const B::Buf<T>, &meta_b),
+                        (&mut self.buf as *mut B::Buf<T>, &meta_a),
                         OpType::Add,
                     ).unwrap();
                 }
@@ -75,7 +75,7 @@ macro_rules! impl_add_assign {
         impl<'a, T, B> AddAssign<$rhs_type> for TensorViewMut<'a, T, B>
         where
             T: TensorValue,
-            B: Backend<T>,
+            B: Backend,
         {
             fn add_assign(&mut self, rhs: $rhs_type) {
                 let (out_shape, broadcast_stra, broadcast_strb) =
@@ -94,9 +94,9 @@ macro_rules! impl_add_assign {
 
                 unsafe {
                     self.backend.broadcast(
-                        (self.buf as *const B::Buf, &meta_a),
-                        (&rhs.buf as *const B::Buf, &meta_b),
-                        (self.buf as *mut B::Buf, &meta_a),
+                        (self.buf as *const B::Buf<T>, &meta_a),
+                        (&rhs.buf as *const B::Buf<T>, &meta_b),
+                        (self.buf as *mut B::Buf<T>, &meta_a),
                         OpType::Add,
                     ).unwrap();
                 }
@@ -108,7 +108,7 @@ macro_rules! impl_add_assign {
         impl<'a, T, B> AddAssign<$rhs_type> for TensorViewMut<'a, T, B>
         where
             T: TensorValue,
-            B: Backend<T>,
+            B: Backend,
         {
             fn add_assign(&mut self, rhs: $rhs_type) {
                 let (out_shape, broadcast_stra, broadcast_strb) =
@@ -127,9 +127,9 @@ macro_rules! impl_add_assign {
 
                 unsafe {
                     self.backend.broadcast(
-                        (self.buf as *const B::Buf, &meta_a),
-                        (rhs.buf as *const B::Buf, &meta_b),
-                        (self.buf as *mut B::Buf, &meta_a),
+                        (self.buf as *const B::Buf<T>, &meta_a),
+                        (rhs.buf as *const B::Buf<T>, &meta_b),
+                        (self.buf as *mut B::Buf<T>, &meta_a),
                         OpType::Add,
                     ).unwrap();
                 }
@@ -145,7 +145,7 @@ macro_rules! impl_add {
         impl<T, B> Add<$rhs_type> for TensorBase<T, B>
         where
             T: TensorValue,
-            B: Backend<T>,
+            B: Backend,
         {
             type Output = TensorBase<T, B>;
 
@@ -160,9 +160,9 @@ macro_rules! impl_add {
 
                 unsafe {
                     self.backend.broadcast(
-                        (&self.buf as *const B::Buf, &meta_a),
-                        (&rhs.buf as *const B::Buf, &meta_b),
-                        (&mut result.buf as *mut B::Buf, &result.meta),
+                        (&self.buf as *const B::Buf<T>, &meta_a),
+                        (&rhs.buf as *const B::Buf<T>, &meta_b),
+                        (&mut result.buf as *mut B::Buf<T>, &result.meta),
                         OpType::Add,
                     ).unwrap();
                 }
@@ -175,7 +175,7 @@ macro_rules! impl_add {
         impl<T, B> Add<$rhs_type> for TensorBase<T, B>
         where
             T: TensorValue,
-            B: Backend<T>,
+            B: Backend,
         {
             type Output = TensorBase<T, B>;
 
@@ -190,9 +190,9 @@ macro_rules! impl_add {
 
                 unsafe {
                     self.backend.broadcast(
-                        (&self.buf as *const B::Buf, &meta_a),
-                        (rhs.buf as *const B::Buf, &meta_b),
-                        (&mut result.buf as *mut B::Buf, &result.meta),
+                        (&self.buf as *const B::Buf<T>, &meta_a),
+                        (rhs.buf as *const B::Buf<T>, &meta_b),
+                        (&mut result.buf as *mut B::Buf<T>, &result.meta),
                         OpType::Add,
                     ).unwrap();
                 }
@@ -205,7 +205,7 @@ macro_rules! impl_add {
         impl<'a, T, B> Add<$rhs_type> for $lhs_type<'a, T, B>
         where
             T: TensorValue,
-            B: Backend<T>,
+            B: Backend,
         {
             type Output = TensorBase<T, B>;
 
@@ -220,9 +220,9 @@ macro_rules! impl_add {
 
                 unsafe {
                     self.backend.broadcast(
-                        (self.buf as *const B::Buf, &meta_a),
-                        (&rhs.buf as *const B::Buf, &meta_b),
-                        (&mut result.buf as *mut B::Buf, &result.meta),
+                        (self.buf as *const B::Buf<T>, &meta_a),
+                        (&rhs.buf as *const B::Buf<T>, &meta_b),
+                        (&mut result.buf as *mut B::Buf<T>, &result.meta),
                         OpType::Add,
                     ).unwrap();
                 }
@@ -235,7 +235,7 @@ macro_rules! impl_add {
         impl<'a, T, B> Add<$rhs_type> for $lhs_type<'a, T, B>
         where
             T: TensorValue,
-            B: Backend<T>,
+            B: Backend,
         {
             type Output = TensorBase<T, B>;
 
@@ -250,9 +250,9 @@ macro_rules! impl_add {
 
                 unsafe {
                     self.backend.broadcast(
-                        (self.buf as *const B::Buf, &meta_a),
-                        (rhs.buf as *const B::Buf, &meta_b),
-                        (&mut result.buf as *mut B::Buf, &result.meta),
+                        (self.buf as *const B::Buf<T>, &meta_a),
+                        (rhs.buf as *const B::Buf<T>, &meta_b),
+                        (&mut result.buf as *mut B::Buf<T>, &result.meta),
                         OpType::Add,
                     ).unwrap();
                 }
@@ -265,7 +265,7 @@ macro_rules! impl_add {
         impl<'a, T, B> Add<$rhs_type> for &'a TensorBase<T, B>
         where
             T: TensorValue,
-            B: Backend<T>,
+            B: Backend,
         {
             type Output = TensorBase<T, B>;
 
@@ -280,9 +280,9 @@ macro_rules! impl_add {
 
                 unsafe {
                     self.backend.broadcast(
-                        (&self.buf as *const B::Buf, &meta_a),
-                        (&rhs.buf as *const B::Buf, &meta_b),
-                        (&mut result.buf as *mut B::Buf, &result.meta),
+                        (&self.buf as *const B::Buf<T>, &meta_a),
+                        (&rhs.buf as *const B::Buf<T>, &meta_b),
+                        (&mut result.buf as *mut B::Buf<T>, &result.meta),
                         OpType::Add,
                     ).unwrap();
                 }
@@ -295,7 +295,7 @@ macro_rules! impl_add {
         impl<'a, T, B> Add<$rhs_type> for &'a TensorBase<T, B>
         where
             T: TensorValue,
-            B: Backend<T>,
+            B: Backend,
         {
             type Output = TensorBase<T, B>;
 
@@ -310,9 +310,9 @@ macro_rules! impl_add {
 
                 unsafe {
                     self.backend.broadcast(
-                        (&self.buf as *const B::Buf, &meta_a),
-                        (rhs.buf as *const B::Buf, &meta_b),
-                        (&mut result.buf as *mut B::Buf, &result.meta),
+                        (&self.buf as *const B::Buf<T>, &meta_a),
+                        (rhs.buf as *const B::Buf<T>, &meta_b),
+                        (&mut result.buf as *mut B::Buf<T>, &result.meta),
                         OpType::Add,
                     ).unwrap();
                 }
@@ -325,7 +325,7 @@ macro_rules! impl_add {
         impl<'a, 'b, T, B> Add<$rhs_type> for &'a $lhs_type<'b, T, B>
         where
             T: TensorValue,
-            B: Backend<T>,
+            B: Backend,
         {
             type Output = TensorBase<T, B>;
 
@@ -340,9 +340,9 @@ macro_rules! impl_add {
 
                 unsafe {
                     self.backend.broadcast(
-                        (self.buf as *const B::Buf, &meta_a),
-                        (&rhs.buf as *const B::Buf, &meta_b),
-                        (&mut result.buf as *mut B::Buf, &result.meta),
+                        (self.buf as *const B::Buf<T>, &meta_a),
+                        (&rhs.buf as *const B::Buf<T>, &meta_b),
+                        (&mut result.buf as *mut B::Buf<T>, &result.meta),
                         OpType::Add,
                     ).unwrap();
                 }
@@ -355,7 +355,7 @@ macro_rules! impl_add {
         impl<'a, 'b, T, B> Add<$rhs_type> for &'a $lhs_type<'b, T, B>
         where
             T: TensorValue,
-            B: Backend<T>,
+            B: Backend,
         {
             type Output = TensorBase<T, B>;
 
@@ -370,9 +370,9 @@ macro_rules! impl_add {
 
                 unsafe {
                     self.backend.broadcast(
-                        (self.buf as *const B::Buf, &meta_a),
-                        (rhs.buf as *const B::Buf, &meta_b),
-                        (&mut result.buf as *mut B::Buf, &result.meta),
+                        (self.buf as *const B::Buf<T>, &meta_a),
+                        (rhs.buf as *const B::Buf<T>, &meta_b),
+                        (&mut result.buf as *mut B::Buf<T>, &result.meta),
                         OpType::Add,
                     ).unwrap();
                 }
