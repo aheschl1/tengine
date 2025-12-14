@@ -669,7 +669,6 @@ fn handle_len(
 ) -> Result<usize, TensorError> {
     let len = match buf.dtype {
         DType::U8 => len_for_dtype!(buf.id, connection, u8, u8_buffers),
-        DType::U8 => len_for_dtype!(buf.id, connection, u8, u8_buffers),
         DType::U16 => len_for_dtype!(buf.id, connection, u16, u16_buffers),
         DType::U32 => len_for_dtype!(buf.id, connection, u32, u32_buffers),
         DType::U64 => len_for_dtype!(buf.id, connection, u64, u64_buffers),

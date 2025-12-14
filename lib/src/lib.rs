@@ -22,6 +22,8 @@
 //! let z = x.matmul(&y).unwrap();
 //! ```
 
+use crate::{backend::cpu::Cpu, core::{untyped::UntypedTensor, Tensor}};
+
 pub mod core;
 pub mod ops;
 pub mod backend;

@@ -12,7 +12,7 @@ mod tests {
     
     #[test]
     fn test_add() {
-        let mut tensor = TensorBase::<i32, Cpu>::from_buf(vec![1, 2, 3], vec![3]).unwrap();
+        let mut tensor: TensorBase<i32, Cpu> = TensorBase::<i32, Cpu>::from_buf(vec![1, 2, 3], vec![3]).unwrap();
         let mut view = tensor.view_mut();
         view += &5;
 
