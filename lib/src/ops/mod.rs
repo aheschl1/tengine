@@ -5089,14 +5089,11 @@ mod cuda_tests {
 #[cfg(feature = "remote")]
 #[cfg(test)]
 mod remote_tests {
-    use std::{ops::Add, sync::{Arc, Mutex, OnceLock}, thread};
+    use std::{ops::Add, sync::OnceLock, thread};
 
-    use crate::{backend::{remote::{client::RemoteBackend, remote_backend_init, server::RemoteServer}, Backend}, core::{primitives::{RemoteTensor, TensorBase}, tensor::{AsView, AsViewMut, TensorAccess, TensorAccessMut, TensorError}, value::TensorValue, MetaTensor, MetaTensorView, Shape, Tensor}};
+    use crate::{backend::{remote::{client::RemoteBackend, get_backend_default, server::RemoteServer}, Backend}, core::{primitives::{RemoteTensor, TensorBase}, tensor::{AsView, AsViewMut, TensorAccess, TensorAccessMut, TensorError}, value::TensorValue, MetaTensor, MetaTensorView, Shape, Tensor}};
 
 
-    const SERVER_IP: &str = "127.0.0.1";
-    const SERVER_PORT: u16 = 7891;  // Different port from remote_tests.rs
-    
     // Lazy static backend shared across all tests
     static BACKEND: OnceLock<RemoteBackend> = OnceLock::new();
     
@@ -5104,20 +5101,14 @@ mod remote_tests {
 
         BACKEND.get_or_init(|| {
             // Start the server
-            let mut server = RemoteServer::new(SERVER_IP.parse().unwrap(), SERVER_PORT);
+            let mut server = RemoteServer::new("127.0.0.1".parse().unwrap(), 7878);
             thread::spawn(move || {
                 let _ = server.serve();
             });
             thread::sleep(std::time::Duration::from_millis(10));
-            
-            thread::spawn(|| {
-                // kill thread
-                thread::sleep(std::time::Duration::from_secs(120));
-                std::process::exit(0);
-            });
 
             // Create and connect the backend
-            let backend = remote_backend_init(SERVER_IP.parse().unwrap(), SERVER_PORT);
+            let backend = get_backend_default().unwrap();
             
             backend
         }).clone()

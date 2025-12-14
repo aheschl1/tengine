@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::{Debug, Display}, io::{Read, Write}, net::IpAddr, sync::{atomic::{AtomicBool, AtomicU32, Ordering}, Arc, Condvar, Mutex, RwLock}};
+use std::{collections::HashMap, fmt::Debug, io::{Read, Write}, net::IpAddr, sync::{atomic::{AtomicBool, AtomicU32, Ordering}, Arc, Condvar, Mutex, RwLock}};
 
 use crate::{backend::{remote::{get_backend_default, protocol::{Messages, Request, Response, Slice, TypelessBuf, Value}}, Backend, BackendMatMul}, core::{primitives::DeviceType, tensor::TensorError, value::{DType, TensorValue}}};
 use flume;
@@ -73,23 +73,23 @@ impl Debug for RemoteBackend {
 }
 
 #[derive(Debug)]
-pub struct Pending {
+struct Pending {
     count: Mutex<u32>,
     cv: Condvar,
 }
 
 impl Pending {
-    pub fn inc(&self) {
+    fn inc(&self) {
         *self.count.lock().unwrap() += 1;
     }
-    pub fn dec(&self) {
+    fn dec(&self) {
         let mut c = self.count.lock().unwrap();
         *c -= 1;
         if *c == 0 {
             self.cv.notify_all();
         }
     }
-    pub fn sync(&self) {
+    fn sync(&self) {
         let mut c = self.count.lock().unwrap();
         while *c > 0 {
             c = self.cv.wait(c).unwrap();
@@ -120,6 +120,10 @@ impl RemoteBackend {
 
     fn poison(&self) {
         self.poisoned.store(true, Ordering::SeqCst);
+    }
+
+    pub fn sync(&self) {
+        self.pending.sync();
     }
 
     #[inline(always)]
@@ -193,9 +197,9 @@ impl Backend for RemoteBackend {
         //     _ => panic!("Unexpected response type"),
         // }
         DeviceType::Remote {
-            ip: todo!(),
-            port: todo!(),
-            remote_type: todo!(),
+            ip: unreachable!(),
+            port: unreachable!(),
+            remote_type: unreachable!(),
         }
     }
 
@@ -376,14 +380,14 @@ fn drain_outgoing(remote: RemoteBackend, mut stream: std::net::TcpStream) {
     let receiver = remote.messages_outgoing_receiver.clone();
     loop {        
         if let Ok(req) = receiver.recv() {
+            if remote.is_poisoned() {
+                break;
+            }
             let serialized = req.serialize().unwrap();
             let n = serialized.len();
             let n_bytes = (n as u32).to_le_bytes();
             stream.write_all(&n_bytes).unwrap();
             stream.write_all(&serialized).unwrap();
-            if let Messages::Broadcast { left, right, dst, op } = &req.message {
-                println!("Sending Broadcast message for ids left: {}, right: {}, dst: {}", left.0.id, right.0.id, dst.0.id);
-            }
         } else {
             // Channel closed, exit thread
             break;
@@ -403,9 +407,6 @@ fn read_response(stream: &mut std::net::TcpStream, len_buf: &mut  [u8; 4]) -> Re
 #[inline]
 fn send_message_to_channel(remote: &RemoteBackend, msg: Response) {
     let task_id = msg.task_id;
-    if let Messages::BroadcastResponse { result } = &msg.message {
-        println!("Received BroadcastResponse for task_id={}", task_id);
-    }
     let sender = {
         let mut pending = remote.pending_response.write().unwrap();
         pending.remove(&task_id)

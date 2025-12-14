@@ -1,9 +1,8 @@
-use core::panic;
 use std::{collections::HashMap, io::{Read, Write}, net::IpAddr, sync::{atomic::AtomicU32, Arc, RwLock}, thread::{self, JoinHandle}};
 
 use flume::Receiver;
 
-use crate::{backend::{cpu::Cpu, remote::{client::RemoteBuf, protocol::{Messages, Request, Response, Slice, TypelessBuf}}, Backend, BackendMatMul, ContiguityTypes}, core::{primitives::DeviceType, tensor::TensorError, value::DType, MetaTensor}, ops::base::OpType};
+use crate::{backend::{cpu::Cpu, remote::{client::RemoteBuf, protocol::{Messages, Request, Response, Slice, TypelessBuf}}, Backend, BackendMatMul, ContiguityTypes}, core::{primitives::DeviceType, tensor::TensorError, value::DType, MetaTensor}};
 #[cfg(feature = "cuda")]
 use crate::backend::cuda::Cuda;
 
@@ -103,7 +102,6 @@ impl RemoteServer {
         for stream in listener.incoming() {
             match stream {
                 Ok(stream) => {
-                    println!("New connection: {}", stream.peer_addr().unwrap());
                     let connection = ClientConnection::new();
                     // launch a new thread 
                     std::thread::spawn(move || {
@@ -134,7 +132,6 @@ macro_rules! alloc_from_slice_for_dtype {
                 let buf = $connection.cpu.alloc_from_slice(boxed_slice)?;
                 let buffer_id = $connection.next_buffer_id.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 $connection.cpu_buffers.write().unwrap().$buffer_field.insert(buffer_id, buf);
-                println!("Allocated CPU buffer with id {}", buffer_id);
                 RemoteBuf {
                     id: buffer_id,
                     dtype: DType::$dtype_variant,
@@ -472,10 +469,6 @@ macro_rules! broadcast_for_dtype {
                 let dst_buf = buffers.$buffer_field
                     .get(&$dst_id)
                     .ok_or_else(|| TensorError::RemoteError(format!("Dst buffer {} not found", $dst_id)))?;
-                
-                println!("Broadcasting on CPU: left_buf id {}, right_buf id {}, dst_buf id {}", $left_id, $right_id, $dst_id);
-                println!("Left buf ptr: {:p}", left_buf);
-                println!("Right buf ptr: {:p}", right_buf);
                 
                 unsafe {
                     $connection.cpu.broadcast(
@@ -1161,14 +1154,6 @@ fn drain_messages(mut stream: std::net::TcpStream, receiver: Receiver<Response>)
         match receiver.recv() {
             Ok(response) => {
                 let result: Result<(), TensorError> = || -> Result<(), TensorError> {
-                    if let Messages::BroadcastResponse { result } = &response.message {
-                        if response.asynchronous && !response.complete {
-                            match result {
-                                Ok(_) => println!("Puting BroadcastResponse on wire (task_id={}) success", response.task_id),
-                                Err(e) => println!("Putting BroadcastResponse on wire (task_id={}) failed with error: {}", response.task_id, e),
-                            }
-                        }
-                    }
                     let serialized = response.serialize()
                         .map_err(|e| TensorError::RemoteError(format!("Failed to serialize response: {}", e)))?;
                     let n = serialized.len() as u32;
@@ -1217,13 +1202,13 @@ fn handle_connection(connection: ClientConnection, mut stream: std::net::TcpStre
                         handle_request(request, &connection);
                     }
                     Err(e) => {
-                        println!("Failed to read data: {}", e);
+                        eprintln!("Failed to read request data: {}", e);
                         break;
                     }
                 }
             }
             Err(e) => {
-                println!("Failed to read size: {}", e);
+                eprintln!("Failed to read request size: {}", e);
                 break;
             }
         }

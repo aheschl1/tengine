@@ -3179,9 +3179,9 @@ mod cuda_tests {
 #[cfg(all(test, feature = "remote"))]
 mod remote_tests {
     use super::*;
-    use std::sync::{Arc, Mutex, OnceLock};
+    use std::sync::OnceLock;
     use std::thread;
-    use crate::backend::remote::remote_backend_init;
+    use crate::backend::remote::get_backend_default;
     use crate::{
         backend::{remote::{client::RemoteBackend, server::RemoteServer}, Backend},
         core::{
@@ -3195,25 +3195,23 @@ mod remote_tests {
         }
     };
     
-    const SERVER_IP: &str = "127.0.0.1";
-    const SERVER_PORT: u16 = 7890;  // Different port from remote_tests.rs
+       // Lazy static backend shared across all tests
+    static BACKEND: OnceLock<RemoteBackend> = OnceLock::new();
     
-    // Lazy static backend shared across all tests
-    static BACKEND: OnceLock<Arc<Mutex<RemoteBackend>>> = OnceLock::new();
-    
-    fn get_backend() -> Arc<Mutex<RemoteBackend>> {
+    fn get_backend() -> RemoteBackend {
+
         BACKEND.get_or_init(|| {
             // Start the server
-            let mut server = RemoteServer::new(SERVER_IP.parse().unwrap(), SERVER_PORT);
+            let mut server = RemoteServer::new("127.0.0.1".parse().unwrap(), 7878);
             thread::spawn(move || {
                 let _ = server.serve();
             });
             thread::sleep(std::time::Duration::from_millis(10));
-            
+
             // Create and connect the backend
-            let backend = remote_backend_init(SERVER_IP.parse().unwrap(), SERVER_PORT);
+            let backend = get_backend_default().unwrap();
             
-            Arc::new(Mutex::new(backend))
+            backend
         }).clone()
     }
     
@@ -3230,8 +3228,7 @@ mod remote_tests {
             )));
         }
         
-        let backend_arc = get_backend();
-        let backend = backend_arc.lock().unwrap();
+        let backend = get_backend();
         let buffer = backend.alloc_from_slice(buf.into())?;
         let stride = crate::core::shape_to_stride(&shape);
         
