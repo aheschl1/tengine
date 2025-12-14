@@ -83,14 +83,14 @@ impl Cuda {
     }
 }
 
-impl<T: TensorValue> Backend<T> for Cuda {
-    type Buf = CudaBuf<T>;
+impl Backend for Cuda {
+    type Buf<T: TensorValue> = CudaBuf<T>;
     
     fn device_type() -> crate::core::primitives::DeviceType {
         crate::core::primitives::DeviceType::Cuda(0)
     }
 
-    fn alloc_from_slice(&self, src: Box<[T]>) -> Result<Self::Buf, crate::core::tensor::TensorError> {
+    fn alloc_from_slice<T: TensorValue>(&self, src: Box<[T]>) -> Result<Self::Buf<T>, crate::core::tensor::TensorError> {
         let ptr = self.stream()
             .clone_htod(src.as_ref())
             .map_err(|e| TensorError::CudaError(e.to_string()))?;
@@ -100,7 +100,7 @@ impl<T: TensorValue> Backend<T> for Cuda {
         })
     }
     
-    fn alloc(&self, len: usize) -> Result<Self::Buf, crate::core::tensor::TensorError> {
+    fn alloc<T: TensorValue>(&self, len: usize) -> Result<Self::Buf<T>, crate::core::tensor::TensorError> {
         let ptr;
         unsafe{
             ptr = self.stream()
@@ -113,7 +113,7 @@ impl<T: TensorValue> Backend<T> for Cuda {
         })
     }
     
-    fn copy_from_slice(&self, dst: &mut Self::Buf, src: &[T]) -> Result<(), crate::core::tensor::TensorError> {
+    fn copy_from_slice<T: TensorValue>(&self, dst: &mut Self::Buf<T>, src: &[T]) -> Result<(), crate::core::tensor::TensorError> {
         self.sync()?;
         if src.len() != dst.len {
             return Err(TensorError::CudaError(format!("Source slice length {} does not match destination buffer length {}", src.len(), dst.len)));
@@ -125,7 +125,7 @@ impl<T: TensorValue> Backend<T> for Cuda {
         Ok(())
     }
     
-    fn read(&self, buf: &Self::Buf, offset: usize) -> Result<T, crate::core::tensor::TensorError> {
+    fn read<T: TensorValue>(&self, buf: &Self::Buf<T>, offset: usize) -> Result<T, crate::core::tensor::TensorError> {
         self.sync()?;
         if offset >= buf.len {
             return Err(TensorError::IdxOutOfBounds(format!(
@@ -142,7 +142,7 @@ impl<T: TensorValue> Backend<T> for Cuda {
         Ok(host_buf[0])
     }
     
-    fn write(&self, buf: &mut Self::Buf, offset: usize, value: T) -> Result<(), crate::core::tensor::TensorError> {
+    fn write<T: TensorValue>(&self, buf: &mut Self::Buf<T>, offset: usize, value: T) -> Result<(), crate::core::tensor::TensorError> {
         self.sync()?;
         if offset >= buf.len {
             return Err(TensorError::IdxOutOfBounds(format!(
@@ -159,7 +159,7 @@ impl<T: TensorValue> Backend<T> for Cuda {
         Ok(())
     }
     
-    fn len(&self, buf: &Self::Buf) -> usize {
+    fn len<T: TensorValue>(&self, buf: &Self::Buf<T>) -> usize {
         buf.len
     }
     
@@ -168,7 +168,7 @@ impl<T: TensorValue> Backend<T> for Cuda {
         Self::construct(0).unwrap()
     }
     
-    fn copy(&self, src: &Self::Buf) -> Result<Self::Buf, TensorError> {
+    fn copy<T: TensorValue>(&self, src: &Self::Buf<T>) -> Result<Self::Buf<T>, TensorError> {
         self.sync()?;
         let mut dst = self.alloc(src.len)?;
         self.stream()
@@ -177,7 +177,7 @@ impl<T: TensorValue> Backend<T> for Cuda {
         Ok(dst)
     }
     
-    fn dump(&self, src: &Self::Buf) -> Result<Box<[T]>, TensorError> {
+    fn dump<T: TensorValue>(&self, src: &Self::Buf<T>) -> Result<Box<[T]>, TensorError> {
         self.sync()?;
         let mut host_buf = vec![T::default(); src.len];
         self.stream()
@@ -187,8 +187,8 @@ impl<T: TensorValue> Backend<T> for Cuda {
     }
 
 
-        fn apply_elementwise_contiguous(
-        &self, buf: &mut Self::Buf, 
+    fn apply_elementwise_contiguous<T: TensorValue>(
+        &self, buf: &mut Self::Buf<T>, 
         op: (OpType, T), 
         start: usize,
         len: usize
@@ -240,8 +240,8 @@ impl<T: TensorValue> Backend<T> for Cuda {
         }
     }
     
-    fn apply_elementwise_1d_strided(
-        &self, buf: &mut Self::Buf, 
+    fn apply_elementwise_1d_strided<T: TensorValue>(
+        &self, buf: &mut Self::Buf<T>, 
         op: (OpType, T), 
         start: usize,
         stride: isize,
@@ -292,9 +292,9 @@ impl<T: TensorValue> Backend<T> for Cuda {
         }
     }
     
-    fn apply_elementwise_nd(
+    fn apply_elementwise_nd<T: TensorValue>(
         &self,
-        buf: &mut Self::Buf,
+        buf: &mut Self::Buf<T>,
         op: (OpType, T),
         offset: usize,
         shape: &[usize],
@@ -353,11 +353,11 @@ impl<T: TensorValue> Backend<T> for Cuda {
         }
     }
 
-    unsafe fn broadcast(
+    unsafe fn broadcast<T: TensorValue>(
         &self, 
-        left: (*const Self::Buf, &MetaTensor), 
-        right: (*const Self::Buf, &MetaTensor),
-        dst: (*mut Self::Buf, &MetaTensor),
+        left: (*const Self::Buf<T>, &MetaTensor), 
+        right: (*const Self::Buf<T>, &MetaTensor),
+        dst: (*mut Self::Buf<T>, &MetaTensor),
         op: OpType
     ) -> Result<(), TensorError> {
         let (lbuf, lmeta) = left;
@@ -445,14 +445,14 @@ macro_rules! generic_matmul_impl {
         impl BackendMatMul<$t> for Cuda {
             fn matmul(
                 &self,
-                lhs: (&Self::Buf, &MetaTensor),
-                rhs: (&Self::Buf, &MetaTensor),
+                lhs: (&Self::Buf<$t>, &MetaTensor),
+                rhs: (&Self::Buf<$t>, &MetaTensor),
                 b: usize,
                 m: usize,
                 k: usize,
                 n: usize,
                 contiguity: ContiguityTypes
-            ) -> Result<Self::Buf, TensorError> {
+            ) -> Result<Self::Buf<$t>, TensorError> {
                 let stream = self.stream();
                 let res = self.alloc(b * m * n)?;
                 
@@ -536,14 +536,14 @@ macro_rules! cublas_impl {
         impl BackendMatMul<$t> for Cuda {
             fn matmul(
                 &self,
-                lhs: (&Self::Buf, &MetaTensor),
-                rhs: (&Self::Buf, &MetaTensor),
+                lhs: (&Self::Buf<$t>, &MetaTensor),
+                rhs: (&Self::Buf<$t>, &MetaTensor),
                 b: usize,
                 m: usize,
                 k: usize,
                 n: usize,
                 contiguity: ContiguityTypes
-            ) -> Result<Self::Buf, TensorError> {
+            ) -> Result<Self::Buf<$t>, TensorError> {
                 // cuBLAS uses column-major order, but our tensors are row-major
                 // To compute C = A * B in row-major, we compute C^T = B^T * A^T in column-major
                 // This means we swap A and B, and swap m and n

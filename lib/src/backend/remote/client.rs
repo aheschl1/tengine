@@ -1,102 +1,444 @@
-use std::{net::IpAddr, sync::{atomic::AtomicBool, Arc}};
+use std::{collections::HashMap, fmt::Debug, io::{Read, Write}, net::IpAddr, sync::{atomic::{AtomicBool, AtomicU32, Ordering}, Arc, Condvar, Mutex, RwLock}};
 
-use crate::{backend::Backend, core::value::TensorValue};
+use crate::{backend::{remote::{get_backend_default, protocol::{Messages, Request, Response, Slice, TypelessBuf, Value}}, Backend, BackendMatMul}, core::{primitives::DeviceType, tensor::TensorError, value::{DType, TensorValue}}};
+use flume;
 
 
-struct RemoteCtx {
-    pub address: IpAddr,
-    pub port: u16
+#[derive(Debug, Clone)]
+pub struct RemoteBuf<T: TensorValue> {
+    pub(crate) id: u32,
+    pub(crate) dtype: DType,
+    pub (crate) _marker: std::marker::PhantomData<T>,
 }
 
-pub struct RemoteBuf {
-    pub id: u64,
-    dirty: Arc<AtomicBool>,
+impl<T: TensorValue> RemoteBuf<T> {
+    #[inline(always)]
+    fn to_typeless(&self) -> TypelessBuf {
+        TypelessBuf {
+            id: self.id,
+            dtype: self.dtype,
+        }
+    }
+
+    #[inline(always)]
+    fn from_typeless(buf: TypelessBuf) -> Self {
+        Self {
+            id: buf.id,
+            dtype: buf.dtype,
+            _marker: std::marker::PhantomData,
+        }
+    }
 }
 
+macro_rules! send_recv {
+    ($self:expr, $message:expr, $response_pattern:pat => $result:expr) => {{
+        let receiver = $self.send_message($message);
+        let response = receiver.recv()
+            .map_err(|_| TensorError::BackendError("Failed to receive response".to_string()))?;
+        match response {
+            $response_pattern => $result,
+            _ => Err(TensorError::BackendError("Unexpected response type".to_string())),
+        }
+    }};
+}
+
+macro_rules! make_op {
+    ($op:expr, $value:expr) => {
+        ($op, Value::from_value($value))
+    };
+}
+
+#[derive(Clone)]
 pub struct RemoteBackend {
-    remote: RemoteCtx,
+    remote_addr: IpAddr,
+    remote_port: u16,
+    message_id: Arc<AtomicU32>,
+    pending: Arc<Pending>,
+    messages_outgoing_sender: flume::Sender<Request>,
+    messages_outgoing_receiver: flume::Receiver<Request>,
+    pending_response: Arc<RwLock<HashMap<u32, flume::Sender<Messages>>>>,
+    poisoned: Arc<AtomicBool>,
+}
+    
+impl Debug for RemoteBackend {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RemoteBackend")
+            .field("remote_addr", &self.remote_addr)
+            .field("remote_port", &self.remote_port)
+            .field("message_id", &self.message_id)
+            .field("pending", &self.pending)
+            .field("pending_response", &self.pending_response)
+            .finish()
+    }
 }
 
-impl<T: TensorValue> Backend<T> for RemoteBackend {
-    type Buf = RemoteBuf;
+#[derive(Debug)]
+struct Pending {
+    count: Mutex<u32>,
+    cv: Condvar,
+}
 
-    fn device_type() -> crate::core::primitives::DeviceType {
-        todo!()
+impl Pending {
+    fn inc(&self) {
+        *self.count.lock().unwrap() += 1;
+    }
+    fn dec(&self) {
+        let mut c = self.count.lock().unwrap();
+        *c -= 1;
+        if *c == 0 {
+            self.cv.notify_all();
+        }
+    }
+    fn sync(&self) {
+        let mut c = self.count.lock().unwrap();
+        while *c > 0 {
+            c = self.cv.wait(c).unwrap();
+        }
+    }
+}
+
+
+impl RemoteBackend {
+    pub fn new_with_address(remote_addr: IpAddr, remote_port: u16) -> Result<Self, std::io::Error> {
+        let pending = Pending {
+            count: Mutex::new(0),
+            cv: Condvar::new(),
+        };
+        let (sender, receiver) = flume::unbounded();
+        let res = Self {
+            remote_addr,
+            remote_port,
+            pending: Arc::new(pending),
+            message_id: Arc::new(AtomicU32::new(0)),
+            messages_outgoing_sender: sender,
+            messages_outgoing_receiver: receiver,
+            pending_response: Arc::new(RwLock::new(HashMap::new())),
+            poisoned: Arc::new(AtomicBool::new(false)),
+        };
+        Ok(res)
     }
 
-    fn alloc_from_slice(&self, src: Box<[T]>) -> Result<Self::Buf, crate::core::tensor::TensorError> {
-        todo!()
+    fn poison(&self) {
+        self.poisoned.store(true, Ordering::SeqCst);
     }
 
-    fn alloc(&self, len: usize) -> Result<Self::Buf, crate::core::tensor::TensorError> {
-        todo!()
+    pub fn sync(&self) {
+        self.pending.sync();
     }
 
-    fn copy_from_slice(&self, dst: &mut Self::Buf, src: &[T]) -> Result<(), crate::core::tensor::TensorError> {
-        todo!()
+    #[inline(always)]
+    fn is_poisoned(&self) -> bool {
+        self.poisoned.load(Ordering::SeqCst)
     }
 
-    fn read(&self, buf: &Self::Buf, offset: usize) -> Result<T, crate::core::tensor::TensorError> {
-        todo!()
+    fn send_message(&self, msg: Messages) -> flume::Receiver<Messages>{
+        if self.is_poisoned() {
+            panic!("Attempted to send message on poisoned RemoteBackend. Reasons for poison:
+            1. An asynchronous operation reported an error from the remote backend.
+            2. The RemoteBackend is in an inconsistent state and can no longer process messages safely.");
+        }
+        self.pending.inc();
+        let (sender, receiver) = flume::bounded(1);
+        let mid = self.next_message_id();
+        {
+            let mut pending = self.pending_response.write().unwrap();
+            pending.insert(mid, sender);
+        }
+        let req = Request {
+            task_id: mid,
+            message: msg,
+        };
+        self.messages_outgoing_sender.send(req).expect("Failed to send message to outgoing channel");
+        receiver
     }
 
-    fn write(&self, buf: &mut Self::Buf, offset: usize, value: T) -> Result<(), crate::core::tensor::TensorError> {
-        todo!()
+    pub(crate) fn connect(&mut self) -> Result<(), std::io::Error> {
+        let stream = std::net::TcpStream::connect((self.remote_addr, self.remote_port))?;
+        stream.set_nodelay(true)?;
+
+        let read_stream = stream.try_clone()?;
+        let write_stream = stream;
+
+        let remote = self.clone();
+        std::thread::spawn(move || {
+            drain_outgoing(remote, write_stream);
+        });
+        let remote = self.clone();
+        std::thread::spawn(move || {
+            read_incoming(remote, read_stream);
+        });
+        Ok(())
     }
 
-    fn len(&self, buf: &Self::Buf) -> usize {
-        todo!()
+    pub fn address(&self) -> (IpAddr, u16) {
+        (self.remote_addr, self.remote_port)
     }
 
-    fn copy(&self, src: &Self::Buf) -> Result<Self::Buf, crate::core::tensor::TensorError> {
-        todo!()
+    #[inline(always)]
+    fn next_message_id(&self) -> u32 {
+        self.message_id.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
     }
 
-    fn dump(&self, src: &Self::Buf) -> Result<Box<[T]>, crate::core::tensor::TensorError> {
-        todo!()
-    }
+}
+
+impl Backend for RemoteBackend {
+    type Buf<T: TensorValue> = RemoteBuf<T>;
 
     fn new() -> Self {
-        todo!()
+        get_backend_default().expect("No default remote backend available")
+    }
+    
+    fn device_type() -> crate::core::primitives::DeviceType {
+        // let message = Messages::DeviceType;
+        // let receiver = self.send_message(message);
+        // let response = receiver.recv().unwrap();
+        // match response {
+        //     Messages::DeviceTypeResponse { device_type } => device_type,
+        //     _ => panic!("Unexpected response type"),
+        // }
+        DeviceType::Remote {
+            ip: unreachable!(),
+            port: unreachable!(),
+            remote_type: unreachable!(),
+        }
     }
 
-    fn apply_elementwise_contiguous(
-        &self, buf: &mut Self::Buf, 
+    fn alloc_from_slice<T: TensorValue>(&self, src: Box<[T]>) -> Result<Self::Buf<T>, crate::core::tensor::TensorError> {
+        let message = Messages::AllocFromSlice {
+            slice: Slice::from_boxed_slice(src),
+        };
+        send_recv!(self, message, Messages::AllocFromSliceResponse { buf } => {
+            Ok(RemoteBuf::from_typeless(buf?))
+        })
+    }
+
+    fn alloc<T: TensorValue>(&self, len: usize) -> Result<Self::Buf<T>, crate::core::tensor::TensorError> {
+        let message = Messages::Alloc {
+            len,
+            dtype: T::DTYPE,
+        };
+        send_recv!(self, message, Messages::AllocResponse { buf } => {
+            Ok(RemoteBuf::from_typeless(buf?))
+        })
+    }
+
+    fn copy_from_slice<T: TensorValue>(&self, dst: &mut Self::Buf<T>, src: &[T]) -> Result<(), crate::core::tensor::TensorError> {
+        self.pending.sync();
+        let message = Messages::CopyFromSlice {
+            dst: dst.to_typeless(),
+            src: Slice::from_slice(src),
+        };
+        send_recv!(self, message, Messages::CopyFromSliceResponse { result } => result)
+    }
+
+    fn read<T: TensorValue>(&self, buf: &Self::Buf<T>, offset: usize) -> Result<T, crate::core::tensor::TensorError> {
+        self.pending.sync();
+        let message = Messages::Read {
+            buf: buf.to_typeless(),
+            offset,
+        };
+        send_recv!(self, message, Messages::ReadResponse { value } => {
+            value?.to_value::<T>()
+        })
+    }
+
+    fn write<T: TensorValue>(&self, buf: &mut Self::Buf<T>, offset: usize, value: T) -> Result<(), crate::core::tensor::TensorError> {
+        self.pending.sync();
+        let message = Messages::Write {
+            buf: buf.to_typeless(),
+            offset,
+            value: Value::from_value(value),
+        };
+        send_recv!(self, message, Messages::WriteResponse { result } => result)
+    }
+
+    fn len<T: TensorValue>(&self, buf: &Self::Buf<T>) -> usize {
+        let message = Messages::Len {
+            buf: buf.to_typeless(),
+        };
+        let receiver = self.send_message(message);
+        match receiver.recv() {
+            Ok(Messages::LenResponse { len }) => len,
+            _ => panic!("Failed to get buffer length or unexpected response"),
+        }
+    }
+
+    fn copy<T: TensorValue>(&self, src: &Self::Buf<T>) -> Result<Self::Buf<T>, crate::core::tensor::TensorError> {
+        self.pending.sync();
+        let message = Messages::Copy {
+            src: src.to_typeless(),
+        };
+        send_recv!(self, message, Messages::CopyResponse { buf } => {
+            Ok(RemoteBuf::from_typeless(buf?))
+        })
+    }
+
+    fn dump<T: TensorValue>(&self, src: &Self::Buf<T>) -> Result<Box<[T]>, crate::core::tensor::TensorError> {
+        self.pending.sync();
+        let message = Messages::Dump {
+            src: src.to_typeless(),
+        };
+        send_recv!(self, message, Messages::DumpResponse { data } => {
+            data?.to_boxed_slice::<T>()
+        })
+    }
+
+    fn apply_elementwise_contiguous<T: TensorValue>(
+        &self, buf: &mut Self::Buf<T>, 
         op: (crate::ops::base::OpType, T), 
         start: usize,
         len: usize
     ) -> Result<(), crate::core::tensor::TensorError> {
-        todo!()
+        let message = Messages::ApplyElementwiseContiguous {
+            buf: buf.to_typeless(),
+            op: make_op!(op.0, op.1),
+            start,
+            len,
+        };
+        send_recv!(self, message, Messages::ApplyElementwiseContiguousResponse { result } => result)
     }
 
-    fn apply_elementwise_1d_strided(
-        &self, buf: &mut Self::Buf, 
+    fn apply_elementwise_1d_strided<T: TensorValue>(
+        &self, buf: &mut Self::Buf<T>, 
         op: (crate::ops::base::OpType, T), 
         offset: usize,
         stride: isize,
         len: usize
     ) -> Result<(), crate::core::tensor::TensorError> {
-        todo!()
+        let message = Messages::ApplyElementwise1DStrided {
+            buf: buf.to_typeless(),
+            op: make_op!(op.0, op.1),
+            offset,
+            stride,
+            len,
+        };
+        send_recv!(self, message, Messages::ApplyElementwise1DStridedResponse { result } => result)
     }
 
-    fn apply_elementwise_nd(
+    fn apply_elementwise_nd<T: TensorValue>(
         &self,
-        buf: &mut Self::Buf,
+        buf: &mut Self::Buf<T>,
         op: (crate::ops::base::OpType, T),
         offset: usize,
         shape: &[usize],
         stride: &[isize],
     ) -> Result<(), crate::core::tensor::TensorError> {
-        todo!()
+        let message = Messages::ApplyElementwiseND {
+            buf: buf.to_typeless(),
+            op: make_op!(op.0, op.1),
+            offset,
+            shape: shape.to_vec(),
+            stride: stride.to_vec(),
+        };
+        send_recv!(self, message, Messages::ApplyElementwiseNDResponse { result } => result)
     }
 
-    unsafe fn broadcast(
-        &self, 
-        left: (*const Self::Buf, &crate::core::MetaTensor), 
-        right: (*const Self::Buf, &crate::core::MetaTensor),
-        dst: (*mut Self::Buf, &crate::core::MetaTensor),
+    unsafe fn broadcast<T: TensorValue>(
+        &self,
+        left: (*const Self::Buf<T>, &crate::core::MetaTensor), 
+        right: (*const Self::Buf<T>, &crate::core::MetaTensor),
+        dst: (*mut Self::Buf<T>, &crate::core::MetaTensor),
         op: crate::ops::base::OpType
     ) -> Result<(), crate::core::tensor::TensorError> {
-        todo!()
+        let message = Messages::Broadcast {
+            left: ((&*left.0).to_typeless(), left.1.clone()),
+            right: ((&*right.0).to_typeless(), right.1.clone()),
+            dst: ((&*dst.0).to_typeless(), dst.1.clone()),
+            op,
+        };
+        send_recv!(self, message, Messages::BroadcastResponse { result } => result)
+    }
+}
+
+impl<T: TensorValue> BackendMatMul<T> for RemoteBackend {
+    fn matmul(
+        &self,
+        lhs: (&Self::Buf<T>, &crate::core::MetaTensor),
+        rhs: (&Self::Buf<T>, &crate::core::MetaTensor),
+        b: usize,
+        m: usize,
+        k: usize,
+        n: usize,
+        contiguity: crate::core::meta::ContiguityTypes,
+    ) -> Result<Self::Buf<T>, TensorError> {
+        let message = Messages::Matmul {
+            lhs: (lhs.0.to_typeless(), lhs.1.clone()),
+            rhs: (rhs.0.to_typeless(), rhs.1.clone()),
+            b,
+            m,
+            k,
+            n,
+            contiguity,
+        };
+        send_recv!(self, message, Messages::MatmulResponse { buf } => {
+            Ok(RemoteBuf::from_typeless(buf?))
+        })
+    }
+}
+
+// todo, make this async
+fn drain_outgoing(remote: RemoteBackend, mut stream: std::net::TcpStream) {
+    let receiver = remote.messages_outgoing_receiver.clone();
+    loop {        
+        if let Ok(req) = receiver.recv() {
+            if remote.is_poisoned() {
+                break;
+            }
+            let serialized = req.serialize().unwrap();
+            let n = serialized.len();
+            let n_bytes = (n as u32).to_le_bytes();
+            stream.write_all(&n_bytes).unwrap();
+            stream.write_all(&serialized).unwrap();
+        } else {
+            // Channel closed, exit thread
+            break;
+        }
+    }
+}
+
+#[inline]
+fn read_response(stream: &mut std::net::TcpStream, len_buf: &mut  [u8; 4]) -> Result<Response, Box<bincode::ErrorKind>> {
+    stream.read_exact(len_buf).unwrap();
+    let msg_len = u32::from_le_bytes(*len_buf) as usize;
+    let mut msg_buf = vec![0u8; msg_len];
+    stream.read_exact(&mut msg_buf).unwrap();
+    Response::deserialize(&msg_buf)
+}
+
+#[inline]
+fn send_message_to_channel(remote: &RemoteBackend, msg: Response) {
+    let task_id = msg.task_id;
+    let sender = {
+        let mut pending = remote.pending_response.write().unwrap();
+        pending.remove(&task_id)
+    };
+    if let Some(sender) = sender {
+        sender.send(msg.message).unwrap();
+    }
+}
+
+fn read_incoming(remote: RemoteBackend, mut stream: std::net::TcpStream) {
+    let mut len_buf = [0u8; 4];
+    loop {
+        let msg = read_response(&mut stream, &mut len_buf).unwrap();
+        if !msg.asynchronous {
+            debug_assert!(msg.complete);
+            send_message_to_channel(&remote, msg);
+            remote.pending.dec();
+        }else{
+            if msg.complete {
+                // no need to send follow up, just decrement pending. because, there was an incomplete one before
+                // that sent the message. async followup is just a backend notification.
+                // nobody waits on follow up of async
+                if let Some(e) = msg.error {
+                    remote.poison();
+                    panic!("Inconsistent state detected. Received error in async message: {:?}", e);
+                } 
+                remote.pending.dec();
+            }else{
+                //send initial follow up to receiver, do not decrement pending yet
+                send_message_to_channel(&remote, msg);
+            }
+        }
     }
 }

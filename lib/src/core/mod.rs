@@ -5,6 +5,7 @@ pub mod tensor;
 pub mod idx;
 pub mod value;
 pub mod slice;
+pub mod untyped;
 
 pub use meta::{Dim, Shape, Strides, MetaTensor, MetaTensorView, shape_to_stride};
 pub use primitives::{Tensor, TensorView, CpuTensorView, TensorViewMut};
@@ -998,7 +999,7 @@ mod tests {
 
     // }
 
-    fn index_tensor<'a, T: TensorValue + PartialEq + std::fmt::Debug, B: Backend<T>>(index: impl Into<Idx>, tensor: &'a impl TensorAccess<T, B>) -> Result<T, TensorError> {
+    fn index_tensor<'a, T: TensorValue + PartialEq + std::fmt::Debug, B: Backend>(index: impl Into<Idx>, tensor: &'a impl TensorAccess<T, B>) -> Result<T, TensorError> {
         let index = index.into();
         let r: Result<T, TensorError> = tensor.get(&index);
         let a = match r.as_ref() {

@@ -7,6 +7,7 @@ fn main() {
         build_cuda_kernels();
     }
     setup_openblas();
+    
     println!("cargo:rerun-if-changed=build.rs");
 }
 
