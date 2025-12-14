@@ -3,7 +3,7 @@ use std::net::IpAddr;
 #[cfg(feature = "remote")]
 use std::{collections::HashMap, sync::Mutex};
 #[cfg(feature = "remote")]
-use std::sync::{LazyLock, OnceLock};
+use std::sync::OnceLock;
 
 use crate::backend::remote::client::RemoteBackend;
 
