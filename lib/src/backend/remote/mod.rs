@@ -41,9 +41,6 @@ pub fn get_backend_default() -> Option<RemoteBackend> {
         .and_then(|map| map.values().next().cloned())
 }
 
-
-
-
 #[cfg(test)]
 mod tests {
     use std::thread;
