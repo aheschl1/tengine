@@ -375,13 +375,11 @@ generic_backend_matmul!(i16);
 generic_backend_matmul!(i32);
 generic_backend_matmul!(i64);
 generic_backend_matmul!(i128);
-generic_backend_matmul!(isize);
 generic_backend_matmul!(u8);
 generic_backend_matmul!(u16);
 generic_backend_matmul!(u32);
 generic_backend_matmul!(u64);
 generic_backend_matmul!(u128);
-generic_backend_matmul!(usize);
 
 #[cfg(test)]
 mod tests {

@@ -306,8 +306,18 @@ impl Backend for Cuda {
         let rank = shape.len();
         let size = shape.iter().product::<usize>();
         // we need ptr to stridde and shape
-        let shape_buf = self.alloc_from_slice(shape.to_vec().into_boxed_slice())?;
-        let stride_buf = self.alloc_from_slice(stride.to_vec().into_boxed_slice())?;
+        let shape_buf = self.alloc_from_slice(
+            shape.to_vec()
+            .into_iter()
+            .map(|x| x as u64)
+            .collect::<Vec<u64>>()
+            .into_boxed_slice())?;
+        let stride_buf = self.alloc_from_slice(
+            stride.to_vec()
+            .into_iter()
+            .map(|x| x as i64)
+            .collect::<Vec<i64>>()
+            .into_boxed_slice())?;
 
         let (stride_ptr, _) = stride_buf.ptr.device_ptr(&stream);
         let (shape_ptr, _) = shape_buf.ptr.device_ptr(&stream);
@@ -373,11 +383,19 @@ impl Backend for Cuda {
         // Allocate device memory for strides and shapes
         // let lshape_buf = self.alloc_from_slice(lmeta.shape.0.clone().into_boxed_slice())?;
         // let rshape_buf = self.alloc_from_slice(rmeta.shape.0.clone().into_boxed_slice())?;
-        let dshape_buf = self.alloc_from_slice(dmeta.shape.0.clone().into_boxed_slice())?;
+        let dshape_buf = self.alloc_from_slice(
+            dmeta.shape.0.clone().into_iter().map(|x| x as u64).collect::<Vec<u64>>().into_boxed_slice()
+        )?;
         
-        let lstride_buf = self.alloc_from_slice(lmeta.strides.0.clone().into_boxed_slice())?;
-        let rstride_buf = self.alloc_from_slice(rmeta.strides.0.clone().clone().into_boxed_slice())?;
-        let dstride_buf = self.alloc_from_slice(dmeta.strides.0.clone().into_boxed_slice())?;
+        let lstride_buf = self.alloc_from_slice(
+            lmeta.strides.0.clone().into_iter().map(|x| x as i64).collect::<Vec<i64>>().into_boxed_slice()
+        )?;
+        let rstride_buf = self.alloc_from_slice(
+            rmeta.strides.0.clone().into_iter().map(|x| x as i64).collect::<Vec<i64>>().into_boxed_slice()
+        )?;
+        let dstride_buf = self.alloc_from_slice(
+            dmeta.strides.0.clone().into_iter().map(|x| x as i64).collect::<Vec<i64>>().into_boxed_slice()
+        )?;
 
         let (lstride_ptr, _) = lstride_buf.ptr.device_ptr(&stream);
         let (rstride_ptr, _) = rstride_buf.ptr.device_ptr(&stream);
