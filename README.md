@@ -1,4 +1,4 @@
-# tensors and such
+# rtensor
 
 Tensor primitives with CUDA and CPU backends. Remote procedure protocol built in at backend level.
 Uses BLAS, cuBLAS, and custom kernels.
