@@ -2,7 +2,7 @@ use std::sync::{atomic::{AtomicBool, Ordering}, Arc, LazyLock};
 
 use cudarc::{cublas::{sys::cublasOperation_t, CudaBlas, Gemm, GemmConfig, StridedBatchedConfig}, driver::{CudaContext, CudaSlice, DevicePtr}};
 
-use crate::{backend::{Backend, BackendMatMul}, core::{tensor::TensorError, value::TensorValue, MetaTensor}, ops::base::OpType};
+use crate::{backend::{Backend, BackendMatMul}, core::{tensor::TensorError, value::{types, TensorValue}, MetaTensor}, ops::base::OpType};
 use crate::backend::ContiguityTypes;
 
 // Include bindgen-generated FFI declarations for CUDA kernel launchers
@@ -459,7 +459,7 @@ impl Backend for Cuda {
 }
 
 macro_rules! generic_matmul_impl {
-    ($t:ty, $launch_fn:ident) => {
+    ($t:ty, $launch_fn:ident, $ptr_t:ty) => {
         impl BackendMatMul<$t> for Cuda {
             fn matmul(
                 &self,
@@ -521,9 +521,9 @@ macro_rules! generic_matmul_impl {
                     let b_offset = rhs_meta.offset + batch_idx * bstride_rhs;
                     let c_offset = batch_idx * m * n;
                     
-                    let a_ptr = unsafe { (lhs_ptr as *const $t).add(a_offset) };
-                    let b_ptr = unsafe { (rhs_ptr as *const $t).add(b_offset) };
-                    let c_ptr = unsafe { (res_ptr as *mut $t).add(c_offset) };
+                    let a_ptr = unsafe { (lhs_ptr as *const $ptr_t).add(a_offset) };
+                    let b_ptr = unsafe { (rhs_ptr as *const $ptr_t).add(b_offset) };
+                    let c_ptr = unsafe { (res_ptr as *mut $ptr_t).add(c_offset) };
                     
                     unsafe {
                         $launch_fn(
@@ -654,13 +654,14 @@ macro_rules! cublas_impl {
 cublas_impl!(f32);
 cublas_impl!(f64);
 
-generic_matmul_impl!(u8, launch_matmul_u8);
-generic_matmul_impl!(u16, launch_matmul_u16);
-generic_matmul_impl!(u32, launch_matmul_u32);
-generic_matmul_impl!(u64, launch_matmul_u64);
-generic_matmul_impl!(u128, launch_matmul_u128);
-generic_matmul_impl!(i8, launch_matmul_i8);
-generic_matmul_impl!(i16, launch_matmul_i16);
-generic_matmul_impl!(i32, launch_matmul_i32);
-generic_matmul_impl!(i64, launch_matmul_i64);
-generic_matmul_impl!(i128, launch_matmul_i128);
+generic_matmul_impl!(u8, launch_matmul_u8, u8);
+generic_matmul_impl!(u16, launch_matmul_u16, u16);
+generic_matmul_impl!(u32, launch_matmul_u32, u32);
+generic_matmul_impl!(u64, launch_matmul_u64, u64);
+generic_matmul_impl!(u128, launch_matmul_u128, u128);
+generic_matmul_impl!(i8, launch_matmul_i8, i8);
+generic_matmul_impl!(i16, launch_matmul_i16, i16);
+generic_matmul_impl!(i32, launch_matmul_i32, i32);
+generic_matmul_impl!(i64, launch_matmul_i64, i64);
+generic_matmul_impl!(i128, launch_matmul_i128, i128);
+generic_matmul_impl!(types::boolean, launch_matmul_boolean, bool);

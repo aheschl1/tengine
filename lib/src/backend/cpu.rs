@@ -1,6 +1,7 @@
 
-use crate::{backend::{Backend, BackendMatMul}, core::{meta::TensorOffsetIterator, tensor::TensorError, value::TensorValue, MetaTensor}, openblas::{blasint, cblas_dgemm, cblas_sgemm, CBLAS_ORDER, CBLAS_TRANSPOSE}, ops::base::OpType};
+use crate::{backend::{Backend, BackendMatMul}, core::{meta::TensorOffsetIterator, tensor::TensorError, value::{types, TensorValue}, MetaTensor}, openblas::{blasint, cblas_dgemm, cblas_sgemm, CBLAS_ORDER, CBLAS_TRANSPOSE}, ops::base::OpType};
 use crate::backend::ContiguityTypes;
+use crate::core::value::TensorDefault;
 
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
 pub struct Cpu;
@@ -337,7 +338,7 @@ macro_rules! generic_backend_matmul {
                     if contiguity == ContiguityTypes::RowMajor {
                         for row in 0..m {
                             for col in 0..n {
-                                let mut sum: $t = 0;
+                                let mut sum: $t = <$t>::ZERO;
                                 for inner in 0..k {
                                     let lhs_idx = lhs_batch + row * lda + inner;
                                     let rhs_idx = rhs_batch + inner * ldb + col;
@@ -349,7 +350,7 @@ macro_rules! generic_backend_matmul {
                     }else {
                         for row in 0..m {
                             for col in 0..n {
-                                let mut sum: $t = 0;
+                                let mut sum: $t = <$t>::ZERO;
                                 for inner in 0..k {
                                     let lhs_idx = lhs_batch + row + inner * lda;
                                     let rhs_idx = rhs_batch + inner + col * ldb;
@@ -380,6 +381,7 @@ generic_backend_matmul!(u16);
 generic_backend_matmul!(u32);
 generic_backend_matmul!(u64);
 generic_backend_matmul!(u128);
+generic_backend_matmul!(types::boolean);
 
 #[cfg(test)]
 mod tests {

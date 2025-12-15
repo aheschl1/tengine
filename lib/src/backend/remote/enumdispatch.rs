@@ -1,4 +1,4 @@
-use crate::{backend::{remote::{client::RemoteBuf, protocol::{Slice, TypelessBuf}, server::ClientConnection}, Backend, BackendMatMul, ContiguityTypes}, core::{primitives::DeviceType, tensor::TensorError, value::DType, MetaTensor}};
+use crate::{backend::{remote::{client::RemoteBuf, protocol::{Slice, TypelessBuf}, server::ClientConnection}, Backend, BackendMatMul, ContiguityTypes}, core::{primitives::DeviceType, tensor::TensorError, value::{types, DType}, MetaTensor}};
 use super::server::select_buffer;
 
 #[inline(always)]
@@ -19,6 +19,7 @@ pub(crate) fn dispatch_alloc_from_slice(
         DType::I128 => alloc_from_slice_for_dtype!(slice, connection, I128, i128, i128_buffers),
         DType::F32 => alloc_from_slice_for_dtype!(slice, connection, F32, f32, f32_buffers),
         DType::F64 => alloc_from_slice_for_dtype!(slice, connection, F64, f64, f64_buffers),
+        DType::BOOL => alloc_from_slice_for_dtype!(slice, connection, BOOL, types::boolean, bool_buffers),
     };
     Ok(remote_buf)
 }
@@ -42,6 +43,7 @@ pub(crate) fn dispatch_alloc(
         DType::I128 => alloc_for_dtype!(len, connection, I128, i128, i128_buffers),
         DType::F32 => alloc_for_dtype!(len, connection, F32, f32, f32_buffers),
         DType::F64 => alloc_for_dtype!(len, connection, F64, f64, f64_buffers),
+        DType::BOOL => alloc_for_dtype!(len, connection, BOOL, types::boolean, bool_buffers),
     };
     Ok(remote_buf)
 }
@@ -65,6 +67,7 @@ pub(crate) fn dispatch_copy_from_slice(
         DType::I128 => copy_from_slice_for_dtype!(dst.id, src, connection, i128, i128_buffers),
         DType::F32 => copy_from_slice_for_dtype!(dst.id, src, connection, f32, f32_buffers),
         DType::F64 => copy_from_slice_for_dtype!(dst.id, src, connection, f64, f64_buffers),
+        DType::BOOL => copy_from_slice_for_dtype!(dst.id, src, connection, types::boolean, bool_buffers),
     }
 }
 
@@ -87,6 +90,7 @@ pub(crate) fn dispatch_read(
         DType::I128 => read_for_dtype!(buf.id, offset, connection, i128, i128_buffers),
         DType::F32 => read_for_dtype!(buf.id, offset, connection, f32, f32_buffers),
         DType::F64 => read_for_dtype!(buf.id, offset, connection, f64, f64_buffers),
+        DType::BOOL => read_for_dtype!(buf.id, offset, connection, types::boolean, bool_buffers),
     };
     Ok(value)
 }
@@ -111,6 +115,7 @@ pub(crate) fn dispatch_write(
         DType::I128 => write_for_dtype!(buf.id, offset, value, connection, i128, i128_buffers),
         DType::F32 => write_for_dtype!(buf.id, offset, value, connection, f32, f32_buffers),
         DType::F64 => write_for_dtype!(buf.id, offset, value, connection, f64, f64_buffers),
+        DType::BOOL => write_for_dtype!(buf.id, offset, value, connection, types::boolean, bool_buffers),
     }
 }
 
@@ -132,6 +137,7 @@ pub(crate) fn dispatch_len(
         DType::I128 => len_for_dtype!(buf.id, connection, i128, i128_buffers),
         DType::F32 => len_for_dtype!(buf.id, connection, f32, f32_buffers),
         DType::F64 => len_for_dtype!(buf.id, connection, f64, f64_buffers),
+        DType::BOOL => len_for_dtype!(buf.id, connection, types::boolean, bool_buffers),
     };
     Ok(len)
 }
@@ -154,6 +160,7 @@ pub(crate) fn dispatch_copy(
         DType::I128 => copy_for_dtype!(src.id, connection, I128, i128, i128_buffers),
         DType::F32 => copy_for_dtype!(src.id, connection, F32, f32, f32_buffers),
         DType::F64 => copy_for_dtype!(src.id, connection, F64, f64, f64_buffers),
+        DType::BOOL => copy_for_dtype!(src.id, connection, BOOL, types::boolean, bool_buffers),
     };
     Ok(new_buf)
 }
@@ -176,6 +183,7 @@ pub(crate) fn dispatch_dump(
         DType::I128 => dump_for_dtype!(src.id, connection, i128, i128_buffers),
         DType::F32 => dump_for_dtype!(src.id, connection, f32, f32_buffers),
         DType::F64 => dump_for_dtype!(src.id, connection, f64, f64_buffers),
+        DType::BOOL => dump_for_dtype!(src.id, connection, types::boolean, bool_buffers),
     };
     Ok(slice)
 }
@@ -202,6 +210,7 @@ pub(crate) fn dispatch_apply_elementwise_contiguous(
         DType::I128 => apply_elementwise_contiguous_for_dtype!(buf.id, op, value, start, len, connection, i128, i128_buffers),
         DType::F32 => apply_elementwise_contiguous_for_dtype!(buf.id, op, value, start, len, connection, f32, f32_buffers),
         DType::F64 => apply_elementwise_contiguous_for_dtype!(buf.id, op, value, start, len, connection, f64, f64_buffers),
+        DType::BOOL => apply_elementwise_contiguous_for_dtype!(buf.id, op, value, start, len, connection, types::boolean, bool_buffers),
     }
 }
 
@@ -228,6 +237,7 @@ pub(crate) fn dispatch_apply_elementwise_1d_strided(
         DType::I128 => apply_elementwise_1d_strided_for_dtype!(buf.id, op, value, offset, stride, len, connection, i128, i128_buffers),
         DType::F32 => apply_elementwise_1d_strided_for_dtype!(buf.id, op, value, offset, stride, len, connection, f32, f32_buffers),
         DType::F64 => apply_elementwise_1d_strided_for_dtype!(buf.id, op, value, offset, stride, len, connection, f64, f64_buffers),
+        DType::BOOL => apply_elementwise_1d_strided_for_dtype!(buf.id, op, value, offset, stride, len, connection, types::boolean, bool_buffers),
     }
 }
 
@@ -254,6 +264,7 @@ pub(crate) fn dispatch_apply_elementwise_nd(
         DType::I128 => apply_elementwise_nd_for_dtype!(buf.id, op, value, offset, shape, stride, connection, i128, i128_buffers),
         DType::F32 => apply_elementwise_nd_for_dtype!(buf.id, op, value, offset, shape, stride, connection, f32, f32_buffers),
         DType::F64 => apply_elementwise_nd_for_dtype!(buf.id, op, value, offset, shape, stride, connection, f64, f64_buffers),
+        DType::BOOL => apply_elementwise_nd_for_dtype!(buf.id, op, value, offset, shape, stride, connection, types::boolean, bool_buffers),
     }
 }
 
@@ -282,6 +293,7 @@ pub(crate) fn dispatch_broadcast(
         DType::I128 => broadcast_for_dtype!(left_buf.id, &left_meta, right_buf.id, &right_meta, dst_buf.id, &dst_meta, op, connection, i128, i128_buffers),
         DType::F32 => broadcast_for_dtype!(left_buf.id, &left_meta, right_buf.id, &right_meta, dst_buf.id, &dst_meta, op, connection, f32, f32_buffers),
         DType::F64 => broadcast_for_dtype!(left_buf.id, &left_meta, right_buf.id, &right_meta, dst_buf.id, &dst_meta, op, connection, f64, f64_buffers),
+        DType::BOOL => broadcast_for_dtype!(left_buf.id, &left_meta, right_buf.id, &right_meta, dst_buf.id, &dst_meta, op, connection, types::boolean, bool_buffers),
     }
 }
 
@@ -312,6 +324,7 @@ pub(crate) fn dispatch_matmul(
         DType::I128 => matmul_for_dtype!(lhs_buf.id, &lhs_meta, rhs_buf.id, &rhs_meta, b, m, k, n, contiguity, connection, I128, i128, i128_buffers),
         DType::F32 => matmul_for_dtype!(lhs_buf.id, &lhs_meta, rhs_buf.id, &rhs_meta, b, m, k, n, contiguity, connection, F32, f32, f32_buffers),
         DType::F64 => matmul_for_dtype!(lhs_buf.id, &lhs_meta, rhs_buf.id, &rhs_meta, b, m, k, n, contiguity, connection, F64, f64, f64_buffers),
+        DType::BOOL => matmul_for_dtype!(lhs_buf.id, &lhs_meta, rhs_buf.id, &rhs_meta, b, m, k, n, contiguity, connection, BOOL, types::boolean, bool_buffers),
     };
     
     Ok(result_buf)

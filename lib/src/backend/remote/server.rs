@@ -2,7 +2,7 @@ use std::{collections::HashMap, io::{Read, Write}, net::IpAddr, sync::{atomic::A
 
 use flume::Receiver;
 
-use crate::{backend::{cpu::Cpu, remote::{enumdispatch::{dispatch_alloc, dispatch_alloc_from_slice, dispatch_apply_elementwise_1d_strided, dispatch_apply_elementwise_contiguous, dispatch_apply_elementwise_nd, dispatch_broadcast, dispatch_copy, dispatch_copy_from_slice, dispatch_dump, dispatch_len, dispatch_matmul, dispatch_read, dispatch_write}, protocol::{Messages, Request, Response, Slice, TypelessBuf}}, Backend}, core::{primitives::DeviceType, tensor::TensorError, MetaTensor}};
+use crate::{backend::{cpu::Cpu, remote::{enumdispatch::{dispatch_alloc, dispatch_alloc_from_slice, dispatch_apply_elementwise_1d_strided, dispatch_apply_elementwise_contiguous, dispatch_apply_elementwise_nd, dispatch_broadcast, dispatch_copy, dispatch_copy_from_slice, dispatch_dump, dispatch_len, dispatch_matmul, dispatch_read, dispatch_write}, protocol::{Messages, Request, Response, Slice, TypelessBuf}}, Backend}, core::{primitives::DeviceType, tensor::TensorError, value::types, MetaTensor}};
 #[cfg(feature = "cuda")]
 use crate::backend::cuda::Cuda;
 
@@ -25,6 +25,7 @@ pub(crate) struct BufferCollection<B:Backend> {
     pub(crate) i128_buffers: HashMap<u32, B::Buf<i128>>,
     pub(crate) f32_buffers: HashMap<u32, B::Buf<f32>>,
     pub(crate) f64_buffers: HashMap<u32, B::Buf<f64>>,
+    pub(crate) bool_buffers: HashMap<u32, B::Buf<types::boolean>>,
 }
 
 impl<B: Backend> Default for BufferCollection<B> {
@@ -42,6 +43,7 @@ impl<B: Backend> Default for BufferCollection<B> {
             i128_buffers: HashMap::new(),
             f32_buffers: HashMap::new(),
             f64_buffers: HashMap::new(),
+            bool_buffers: HashMap::new(),
         }
     }
 }

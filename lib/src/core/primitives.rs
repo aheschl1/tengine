@@ -278,7 +278,7 @@ where
     pub fn zeros(shape: impl Into<Shape>) -> Self {
         let shape: Shape = shape.into();
         let element_count = shape.iter().product::<usize>();
-        let zero_buf = vec![T::zero(); element_count];
+        let zero_buf = vec![T::ZERO; element_count];
         Self::from_buf(zero_buf, shape).expect("Failed to allocate memory")
     }
 
@@ -294,7 +294,7 @@ where
     pub fn ones(shape: impl Into<Shape>) -> Self {
         let shape: Shape = shape.into();
         let element_count = shape.iter().product::<usize>();
-        let one_buf = vec![T::one(); element_count];
+        let one_buf = vec![T::ONE; element_count];
         Self::from_buf(one_buf, shape).expect("Failed to allocate memory")
     }
 
@@ -305,7 +305,7 @@ where
     pub fn max(shape: impl Into<Shape>) -> Self {
         let shape: Shape = shape.into();
         let element_count = shape.iter().product::<usize>();
-        let max_buf = vec![T::max(); element_count];
+        let max_buf = vec![T::MAX; element_count];
         Self::from_buf(max_buf, shape).expect("Failed to allocate memory")
     }
 
@@ -316,7 +316,7 @@ where
     pub fn min(shape: impl Into<Shape>) -> Self {
         let shape: Shape = shape.into();
         let element_count = shape.iter().product::<usize>();
-        let min_buf = vec![T::min(); element_count];
+        let min_buf = vec![T::MIN; element_count];
         Self::from_buf(min_buf, shape).expect("Failed to allocate memory")
     }
 

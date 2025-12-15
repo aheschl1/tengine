@@ -15,6 +15,9 @@ pub trait TensorValue:
     std::ops::Add<Output = Self> + 
     std::ops::Sub<Output = Self> + 
     std::ops::Mul<Output = Self> +
+    std::ops::AddAssign +
+    std::ops::SubAssign +
+    std::ops::MulAssign +
     'static
 {
     const DTYPE: crate::core::value::DType;
@@ -32,6 +35,9 @@ pub trait TensorValue:
     std::ops::Add<Output = Self> + 
     std::ops::Sub<Output = Self> + 
     std::ops::Mul<Output = Self> +
+    std::ops::AddAssign +
+    std::ops::SubAssign +
+    std::ops::MulAssign +
     'static
 {
     const DTYPE: crate::core::value::DType;
@@ -39,17 +45,10 @@ pub trait TensorValue:
 
 /// Provides default constant values for tensor element types.
 pub trait TensorDefault {
-    /// Returns the zero value.
-    fn zero() -> Self;
-    
-    /// Returns the one value.
-    fn one() -> Self;
-    
-    /// Returns the minimum value.
-    fn min() -> Self;
-    
-    /// Returns the maximum value.
-    fn max() -> Self;
+    const ZERO: Self;
+    const ONE: Self;
+    const MIN: Self;
+    const MAX: Self;
 }
 
 
@@ -66,10 +65,10 @@ macro_rules! impl_tensor_values {
 macro_rules! impl_default {
     ($type:ty, $zero:expr, $one:expr, $min:expr, $max:expr) => {
         impl TensorDefault for $type {
-            fn zero() -> Self {$zero}
-            fn one() -> Self {$one}
-            fn min() -> Self {$min}
-            fn max() -> Self {$max}
+            const ZERO: Self = $zero;
+            const ONE: Self = $one;
+            const MIN: Self = $min;
+            const MAX: Self = $max;
         }
     };
 }
@@ -127,5 +126,139 @@ pub enum DType {
     I128 = 9,
     F32 = 10,
     F64 = 11,
+    BOOL = 12,
 }
 
+#[allow(non_camel_case_types)]
+pub mod types {
+    use std::ops::{AddAssign, Deref, DerefMut};
+    #[cfg(feature = "cuda")]
+    use cudarc::driver::DeviceRepr;
+
+    use crate::core::value::{DType, TensorDefault, TensorValue};
+
+    #[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+    #[repr(C)]
+    pub struct boolean(pub bool);
+
+    impl boolean {
+        pub const FALSE: Self = Self(false);
+        pub const TRUE: Self = Self(true);
+    }
+
+    // the poiunters and refs are for inner
+    impl AsRef<bool> for boolean {
+        #[inline(always)]
+        fn as_ref(&self) -> &bool {
+            &self.0
+        }
+    }
+
+    impl AsMut<bool> for boolean {
+        #[inline(always)]
+        fn as_mut(&mut self) -> &mut bool {
+            &mut self.0
+        }
+    }
+
+    impl Deref for boolean {
+        type Target = bool;
+        #[inline(always)]
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    impl DerefMut for boolean {
+        #[inline(always)]
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.0
+        }
+    }
+
+    impl From<u8> for boolean {
+        #[inline(always)]
+        fn from(value: u8) -> Self {
+            Self(value != 0)
+        }
+    }
+
+    impl TensorDefault for boolean {
+        const ZERO: Self = Self::FALSE;
+        const ONE: Self = Self::TRUE;
+        const MIN: Self = Self::FALSE;
+        const MAX: Self = Self::TRUE;
+    }
+
+    impl std::ops::Add for boolean {
+        type Output = Self;
+        fn add(self, rhs: Self) -> Self::Output {
+            Self(self.0 || rhs.0)
+        }
+    }
+
+    impl std::ops::Sub for boolean {
+        type Output = Self;
+        fn sub(self, rhs: Self) -> Self::Output {
+            Self(self.0 && !rhs.0)
+        }
+    }
+
+    impl std::ops::Mul for boolean {
+        type Output = Self;
+        fn mul(self, rhs: Self) -> Self::Output {
+            Self(self.0 && rhs.0)
+        }
+    }
+
+    impl AddAssign for boolean {
+        fn add_assign(&mut self, rhs: Self) {
+            self.0 = self.0 || rhs.0;
+        }
+    }
+
+    impl std::ops::SubAssign for boolean {
+        fn sub_assign(&mut self, rhs: Self) {
+            self.0 = self.0 && !rhs.0;
+        }
+    }
+
+    impl std::ops::MulAssign for boolean {
+        fn mul_assign(&mut self, rhs: Self) {
+            self.0 = self.0 && rhs.0;
+        }
+    }
+
+    impl From<boolean> for bool {
+        fn from(value: boolean) -> Self {
+            value.0
+        }
+    }
+
+    impl From<bool> for boolean {
+        fn from(value: bool) -> Self {
+            Self(value)
+        }
+    }
+
+    impl TensorValue for boolean {
+        const DTYPE: DType = DType::BOOL;
+    }
+
+    #[cfg(feature = "cuda")]
+    unsafe impl DeviceRepr for boolean {}
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::core::{value::types::boolean, Tensor};
+
+    #[test]
+    fn boolean_tensor() {
+        let mut tensor = Tensor::<boolean>::zeros((2, 3));
+        tensor += boolean(true);
+        tensor += boolean(true);
+        let expected = Tensor::<boolean>::ones((2, 3));
+        assert_eq!(tensor, expected);
+    }   
+}

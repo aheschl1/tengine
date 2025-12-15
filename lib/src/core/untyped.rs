@@ -1,4 +1,4 @@
-use crate::{backend::{Backend}, core::{primitives::{DeviceType, TensorBase}, tensor::{AsView, AsViewMut}, value::{DType, TensorValue}, MetaTensor, TensorView, TensorViewMut}};
+use crate::{backend::Backend, core::{primitives::{DeviceType, TensorBase}, tensor::{AsView, AsViewMut}, value::{types, DType, TensorValue}, MetaTensor, TensorView, TensorViewMut}};
 
 /// Trait for erased tensors, allowing dynamic dispatch on tensor types.
 /// Implemented for all `TensorBase<T, B>` where `T: TensorValue` and `B: Backend<T>`.
@@ -55,6 +55,7 @@ impl<B: Backend> dyn UntypedTensor<B> {
             DType::I128 => UnknownTensor::I128(self.typed::<i128>().unwrap()),
             DType::F32 => UnknownTensor::F32(self.typed::<f32>().unwrap()),
             DType::F64 => UnknownTensor::F64(self.typed::<f64>().unwrap()),
+            DType::BOOL => UnknownTensor::BOOL(self.typed::<types::boolean>().unwrap()),
         }
     }
 
@@ -72,6 +73,7 @@ impl<B: Backend> dyn UntypedTensor<B> {
             DType::I128 => UnknownTensorMut::I128(self.typed_mut::<i128>().unwrap()),
             DType::F32 => UnknownTensorMut::F32(self.typed_mut::<f32>().unwrap()),
             DType::F64 => UnknownTensorMut::F64(self.typed_mut::<f64>().unwrap()),
+            DType::BOOL => UnknownTensorMut::BOOL(self.typed_mut::<types::boolean>().unwrap()),
         }
     }
 
@@ -120,6 +122,7 @@ pub enum UnknownTensor<'a, B: Backend> {
     I128(&'a TensorBase<i128, B>),
     F32(&'a TensorBase<f32, B>),
     F64(&'a TensorBase<f64, B>),
+    BOOL(&'a TensorBase<types::boolean, B>),
 }
 
 pub enum UnknownTensorMut<'a, B: Backend> {
@@ -135,6 +138,7 @@ pub enum UnknownTensorMut<'a, B: Backend> {
     I128(&'a mut TensorBase<i128, B>),
     F32(&'a mut TensorBase<f32, B>),
     F64(&'a mut TensorBase<f64, B>),
+    BOOL(&'a mut TensorBase<types::boolean, B>),
 }
 
 

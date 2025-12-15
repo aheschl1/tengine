@@ -15,6 +15,7 @@ void launch_matmul_i16(const int16_t* A, const int16_t* B, int16_t* C, size_t M,
 void launch_matmul_i32(const int32_t* A, const int32_t* B, int32_t* C, size_t M, size_t N, size_t K, size_t lda, size_t ldb, size_t ldc, ContiguityType contiguity, unsigned int block_size);
 void launch_matmul_i64(const int64_t* A, const int64_t* B, int64_t* C, size_t M, size_t N, size_t K, size_t lda, size_t ldb, size_t ldc, ContiguityType contiguity, unsigned int block_size);
 void launch_matmul_i128(const __int128_t* A, const __int128_t* B, __int128_t* C, size_t M, size_t N, size_t K, size_t lda, size_t ldb, size_t ldc, ContiguityType contiguity, unsigned int block_size);
+void launch_matmul_boolean(const bool* A, const bool* B, bool* C, size_t M, size_t N, size_t K, size_t lda, size_t ldb, size_t ldc, ContiguityType contiguity, unsigned int block_size);
 
 #ifdef __cplusplus
 }
