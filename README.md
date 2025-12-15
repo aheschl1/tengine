@@ -1,6 +1,6 @@
 # rtensor
 
-Tensor primitives with CUDA and CPU backends. Remote procedure protocol built in at backend level.
+Tensor primitives with CUDA and CPU backends. Remote execution protocol built in at backend level.
 Uses BLAS, cuBLAS, and custom kernels.
 
 Goal is high performance ML stack with minimal dependencies, and the flexibility of numpy.
