@@ -10,7 +10,7 @@ impl<T: TensorValue + std::ops::Neg<Output = T>, B: Backend, V: AsViewMut<T, B>>
     fn neg_inplace(
         &mut self
     ) {
-        let mut view = self.view_mut();
+        let view = self.view_mut();
         // will never fail, could in theory ignore the result
         if let Err(e) = view.backend.apply_neg(view.buf, &view.meta) {
             panic!("Failed to apply negation: {}", e);

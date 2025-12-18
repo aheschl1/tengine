@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 #[cfg_attr(feature = "remote", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy)]
 pub enum BinaryOpType {
-    Add,
-    Sub,
-    Mul
+    Add = 0,
+    Sub = 1,
+    Mul = 2
 }
 
 #[cfg(feature = "cuda")]
