@@ -465,7 +465,7 @@ impl Backend for Cuda {
         }
     }
     
-    fn apply_neg_contiguous<T: TensorValue>(
+    fn apply_neg_contiguous<T: TensorValue + std::ops::Neg<Output = T>>(
         &self, buf: &mut Self::Buf<T>, 
         start: usize,
         len: usize
@@ -503,7 +503,7 @@ impl Backend for Cuda {
         }
     }
     
-    fn apply_neg_1d_strided<T: TensorValue>(
+    fn apply_neg_1d_strided<T: TensorValue + std::ops::Neg<Output = T>>(
         &self, buf: &mut Self::Buf<T>, 
         offset: usize,
         stride: isize,
@@ -543,7 +543,7 @@ impl Backend for Cuda {
         }
     }
     
-    fn apply_neg_nd<T: TensorValue>(
+    fn apply_neg_nd<T: TensorValue + std::ops::Neg<Output = T>>(
         &self,
         buf: &mut Self::Buf<T>,
         offset: usize,
