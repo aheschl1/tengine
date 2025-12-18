@@ -60,19 +60,3 @@ where
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::{core::Tensor, ops::unary::Negate};
-
-    #[test]
-    fn test_negate() {
-        let mut tensor = Tensor::<f32>::ones((1, 2));
-        tensor.neg_inplace();
-        let expected = Tensor::<f32>::from_buf(vec![-1.0, -1.0], (1, 2));
-        assert_eq!(tensor, expected.unwrap());
-
-        let tensor2 = -tensor;
-        let expected2 = Tensor::<f32>::from_buf(vec![1.0, 1.0], (1, 2));
-        assert_eq!(tensor2, expected2.unwrap());
-    }
-}

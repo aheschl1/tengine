@@ -371,6 +371,7 @@ impl Messages {
             Messages::ApplyElementwiseBinaryResponse { .. } |
             Messages::MatmulResponse { .. } |
             Messages::ApplyNeg1DStridedResponse { .. } |
+            Messages::ApplyNegContiguousResponse { .. } |
             Messages::ApplyNegNDResponse { .. } |
             Messages::ErrorResponse { .. } |
             Messages::ActionCompleted { .. } |
