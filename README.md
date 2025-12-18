@@ -211,3 +211,19 @@ let backend = RemoteBackend::new("127.0.0.1", 7878);
 backend.connect().unwrap();
 let remote_tensor = RemoteTensor::from_parts(backend, vec![1, 2, 3, 4, 5, 6], Shape::from((2, 2))).unwrap();
 ```
+
+## Boolean Type
+
+The `boolean` type represents boolean values in tensors. It supports logical operations as follows:
+
+- Addition (`+`): Logical OR operation.
+- Subtraction (`-`): Logical XOR operation.
+- Multiplication (`*`): Logical AND operation.
+
+```rust
+let a = Tensor::<boolean>::from_buf(vec![boolean(true), boolean(false), boolean(true), boolean(false)], (4,)).unwrap();
+let b = Tensor::<boolean>::from_buf(vec![boolean(true), boolean(true), boolean(false), boolean(false)], (4,)).unwrap();
+let result_add = a + b; // Logical OR
+let result_sub = a - b; // Logical XOR
+let result_mul = a * b; // Logical AND
+```
