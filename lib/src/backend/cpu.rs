@@ -1,7 +1,7 @@
 
 use std::ops::Div;
 
-use crate::{backend::{Backend, BackendMatMul}, core::{MetaTensor, meta::TensorOffsetIterator, primops::InvExp, tensor::TensorError, value::{TensorValue, types}}, openblas::{CBLAS_ORDER, CBLAS_TRANSPOSE, blasint, cblas_dgemm, cblas_sgemm}, ops::base::BinaryOpType};
+use crate::{backend::{Backend, BackendMatMul}, core::{MetaTensor, Tensor, meta::TensorOffsetIterator, primops::{Exp, InvExp}, tensor::TensorError, value::{TensorValue, types}}, openblas::{CBLAS_ORDER, CBLAS_TRANSPOSE, blasint, cblas_dgemm, cblas_sgemm}, ops::base::BinaryOpType};
 use crate::backend::ContiguityTypes;
 use crate::core::value::TypeConstants;
 
@@ -111,6 +111,7 @@ impl Backend for Cpu {
         dst.copy_from_slice(src);
         Ok(())
     }
+
 
     fn read<T: TensorValue>(&self, buf: &Self::Buf<T>, offset: usize) -> Result<T, TensorError> {
         Ok(*buf.get(offset).ok_or(
@@ -276,8 +277,17 @@ impl Backend for Cpu {
     impl_cpu_unary!{ neg, _negate where T: std::ops::Neg<Output = T> }
     impl_cpu_unary!{ relu, _relu }
     impl_cpu_unary!{ sigmoid, _sigmoid where T: InvExp }
+    impl_cpu_unary!{ tanh, _tanh where T: InvExp + Exp }
 
 }
+
+#[inline]
+fn _tanh<T: TensorValue + Exp + InvExp>(x: &mut T) -> T {
+    let a = x.apply_exp();
+    let b = x.apply_invexp();
+    (a - b) / (a + b)
+}
+
 
 #[inline]
 fn _negate<T: TensorValue + std::ops::Neg<Output = T>>(x: &mut T) -> T {

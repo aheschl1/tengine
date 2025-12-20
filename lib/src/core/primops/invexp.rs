@@ -21,11 +21,3 @@ impl InvExp for f64 {
         (-*self).exp()
     }
 }
-
-// TODO: Implement for integers.
-impl InvExp for boolean {
-    #[inline]
-    fn apply_invexp(&self) -> Self {
-        *self
-    }
-}

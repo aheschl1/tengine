@@ -28,6 +28,8 @@ pub mod ops;
 pub mod backend;
 pub mod macros;
 
+pub(crate) mod testing;
+
 pub(crate) mod openblas {
     #![allow(non_upper_case_globals)]
     #![allow(non_camel_case_types)]
