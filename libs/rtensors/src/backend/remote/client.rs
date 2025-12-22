@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt::Debug, io::{Read, Write}, net::IpAddr, sync::{atomic::{AtomicBool, AtomicU32, Ordering}, Arc, Condvar, Mutex, RwLock}};
 
-use crate::{backend::{remote::{get_backend_default, protocol::{Messages, Request, Response, Slice, TypelessBuf, Value}}, Backend, BackendMatMul}, core::{primitives::DeviceType, primops::{Exp, InvExp}, tensor::TensorError, value::{DType, TensorValue}}};
+use crate::{backend::{remote::{get_backend_default, protocol::{Request, Response, Slice, TypelessBuf, Value}}, Backend, BackendMatMul}, core::{primitives::DeviceType, primops::{Exp, InvExp}, tensor::TensorError, value::{DType, TensorValue}}};
 use flume;
 
 
@@ -87,7 +87,7 @@ pub struct RemoteBackend {
     pending: Arc<PendingHandler>,
     messages_outgoing_sender: flume::Sender<Request>,
     messages_outgoing_receiver: flume::Receiver<Request>,
-    pending_response: Arc<RwLock<HashMap<u32, flume::Sender<Messages>>>>,
+    pending_response: Arc<RwLock<HashMap<u32, flume::Sender<rpc_proc::RpcMessages>>>>,
     poisoned: Arc<AtomicBool>,
 }
     
@@ -137,8 +137,7 @@ impl RemoteBackend {
         self.poisoned.load(Ordering::SeqCst)
     }
 
-    // #[rpc_proc::send_message]
-    fn send_message(&self, msg: Messages) -> flume::Receiver<_>{
+    fn send_message(&self, msg: rpc_proc::RpcMessages) -> flume::Receiver<rpc_proc::RpcMessages>{
         if self.is_poisoned() {
             panic!("Attempted to send message on poisoned RemoteBackend. Reasons for poison:
             1. An asynchronous operation reported an error from the remote backend.
@@ -200,7 +199,7 @@ macro_rules! send_recv {
     }};
 }
 
-#[rpc_proc::rpc(
+#[rpc_proc::routines(
     Box<[T]> = Slice,
     &T = Slice,
     Self::Buf<T> = TypelessBuf,

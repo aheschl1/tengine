@@ -6,16 +6,9 @@ use quote::{format_ident, quote, ToTokens};
 use syn::{parenthesized, parse::{Parse, ParseStream}, parse_macro_input, parse_quote, punctuated::Punctuated, spanned::Spanned, visit::Visit, Expr, Ident, ItemImpl, Token, Type};
 use syn::Result;
 
-#[proc_macro_attribute]
-pub fn send_message(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    let function = quote::quote! {
-        item
-    };
-    function.into()
-}
 
 #[proc_macro_attribute]
-pub fn rpc(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn routines(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut impl_block = parse_macro_input!(item as ItemImpl);
     let generics: Vec<_> = impl_block.generics.type_params().map(|p| p.ident.clone()).collect();
 
@@ -81,8 +74,11 @@ pub fn rpc(attr: TokenStream, item: TokenStream) -> TokenStream {
     }
     let message_variants = quote::quote! {
         #impl_block
-        enum RpcMessages {
-            #( #message_variants )*
+        pub(crate) mod rpc_proc {
+            use super::*;
+            pub(crate) enum RpcMessages {
+                #( #message_variants )*
+            }
         }
     };
 
