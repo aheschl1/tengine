@@ -158,6 +158,12 @@ pub struct MetaTensor {
     pub offset: usize,
 }
 
+impl From<&MetaTensor> for MetaTensor {
+    fn from(meta: &MetaTensor) -> Self {
+        meta.clone()
+    }
+}
+
 impl MetaTensor {
     /// Creates tensor metadata with explicit shape, stride and offset.
     pub fn new(shape: impl Into<Shape>, strides: impl Into<Strides>, offset: usize) -> Self {

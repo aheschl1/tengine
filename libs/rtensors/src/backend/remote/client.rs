@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt::Debug, io::{Read, Write}, net::IpAddr, sync::{atomic::{AtomicBool, AtomicU32, Ordering}, Arc, Condvar, Mutex, RwLock}};
 
-use crate::{backend::{remote::{get_backend_default, protocol::{Messages, Request, Response, Slice, TypelessBuf, Value}}, Backend, BackendMatMul}, core::{primitives::DeviceType, primops::{Exp, InvExp}, tensor::TensorError, value::{DType, TensorValue}}};
+use crate::{backend::{remote::{get_backend_default, protocol::{Messages, Request, Response, TypelessBuf}}, Backend, BackendMatMul}, core::{primitives::DeviceType, primops::{Exp, InvExp}, tensor::TensorError, value::{DType, TensorValue}}};
 use flume;
 
 
@@ -21,7 +21,7 @@ impl<T: TensorValue> RemoteBuf<T> {
     }
 
     #[inline(always)]
-    fn from_typeless(buf: TypelessBuf) -> Self {
+    pub(crate) fn from_typeless(buf: TypelessBuf) -> Self {
         Self {
             id: buf.id,
             dtype: buf.dtype,
@@ -30,6 +30,29 @@ impl<T: TensorValue> RemoteBuf<T> {
     }
 }
 
+impl<T: TensorValue> From<&mut RemoteBuf<T>> for TypelessBuf {
+    fn from(buf: &mut RemoteBuf<T>) -> Self {
+        buf.to_typeless()
+    }
+}
+
+impl<T: TensorValue> From<&RemoteBuf<T>> for TypelessBuf {
+    fn from(buf: &RemoteBuf<T>) -> Self {
+        buf.to_typeless()
+    }
+}
+
+impl<T: TensorValue> From<*const RemoteBuf<T>> for TypelessBuf {
+    fn from(buf: *const RemoteBuf<T>) -> Self {
+        unsafe { (&*buf).to_typeless() }
+    }
+}
+
+impl<T: TensorValue> From<*mut RemoteBuf<T>> for TypelessBuf {
+    fn from(buf: *mut RemoteBuf<T>) -> Self {
+        unsafe { (&*buf).to_typeless() }
+    }
+}
 
 #[derive(Debug)]
 struct PendingHandler {
@@ -164,31 +187,26 @@ impl RemoteBackend {
 
 }
 
-macro_rules! send_recv {
-    ($self:expr, $message:expr, $response_pattern:pat => $result:expr) => {{
-        let receiver = $self.send_message($message);
-        let response = receiver.recv()
-            .map_err(|_| TensorError::BackendError("Failed to receive response".to_string()))?;
-        match response {
-            $response_pattern => $result,
-            _ => Err(TensorError::BackendError("Unexpected response type".to_string())),
-        }
-    }};
-}
+// macro_rules! send_recv {
+//     ($self:expr, $message:expr, $response_pattern:pat => $result:expr) => {{
+//         let receiver = $self.send_message($message);
+//         let response = receiver.recv()
+//             .map_err(|_| TensorError::BackendError("Failed to receive response".to_string()))?;
+//         match response {
+//             $response_pattern => $result,
+//             _ => Err(TensorError::BackendError("Unexpected response type".to_string())),
+//         }
+//     }};
+// }
 
-macro_rules! make_op {
-    ($op:expr, $value:expr) => {
-        ($op, Value::from_value($value))
-    };
-}
-
+#[rpc_proc::routines(Messages)]
 impl Backend for RemoteBackend {
     type Buf<T: TensorValue> = RemoteBuf<T>;
-
+    #[rpc(skip)]
     fn new() -> Self {
         get_backend_default().expect("No default remote backend available")
     }
-    
+    #[rpc(skip)]
     fn device_type() -> crate::core::primitives::DeviceType {
         // let message = Messages::DeviceType;
         // let receiver = self.send_message(message);
@@ -203,137 +221,60 @@ impl Backend for RemoteBackend {
             remote_type: DeviceType::Cpu.into(),
         }
     }
-
-    fn alloc_from_slice<T: TensorValue>(&self, src: Box<[T]>) -> Result<Self::Buf<T>, crate::core::tensor::TensorError> {
-        let message = Messages::AllocFromSlice {
-            slice: Slice::from_boxed_slice(src),
-        };
-        send_recv!(self, message, Messages::AllocFromSliceResponse { buf } => {
-            Ok(RemoteBuf::from_typeless(buf?))
-        })
-    }
-
-    fn alloc<T: TensorValue>(&self, len: usize) -> Result<Self::Buf<T>, crate::core::tensor::TensorError> {
-        let message = Messages::Alloc {
-            len,
-            dtype: T::DTYPE,
-        };
-        send_recv!(self, message, Messages::AllocResponse { buf } => {
-            Ok(RemoteBuf::from_typeless(buf?))
-        })
-    }
-
-    fn copy_from_slice<T: TensorValue>(&self, dst: &mut Self::Buf<T>, src: &[T]) -> Result<(), crate::core::tensor::TensorError> {
-        self.pending.sync();
-        let message = Messages::CopyFromSlice {
-            dst: dst.to_typeless(),
-            src: Slice::from_slice(src),
-        };
-        send_recv!(self, message, Messages::CopyFromSliceResponse { result } => result)
-    }
-
-    fn read<T: TensorValue>(&self, buf: &Self::Buf<T>, offset: usize) -> Result<T, crate::core::tensor::TensorError> {
-        self.pending.sync();
-        let message = Messages::Read {
-            buf: buf.to_typeless(),
-            offset,
-        };
-        send_recv!(self, message, Messages::ReadResponse { value } => {
-            value?.to_value::<T>()
-        })
-    }
-
-    fn write<T: TensorValue>(&self, buf: &mut Self::Buf<T>, offset: usize, value: T) -> Result<(), crate::core::tensor::TensorError> {
-        self.pending.sync();
-        let message = Messages::Write {
-            buf: buf.to_typeless(),
-            offset,
-            value: Value::from_value(value),
-        };
-        send_recv!(self, message, Messages::WriteResponse { result } => result)
-    }
-
+    fn alloc_from_slice<T: TensorValue>(&self, src: Box<[T]>) -> Result<Self::Buf<T>, crate::core::tensor::TensorError>{unreachable!("Macro implmented")}
+    #[rpc(extra(dtype: DType = T::DTYPE))]
+    fn alloc<T: TensorValue>(&self, len: usize) -> Result<Self::Buf<T>, crate::core::tensor::TensorError>{unreachable!("Macro implmented")}
+    
+    #[rpc(sync)]
+    fn copy_from_slice<T: TensorValue>(&self, dst: &mut Self::Buf<T>, src: &[T]) -> Result<(), crate::core::tensor::TensorError> {unreachable!("Macro implmented")}
+    
+    #[rpc(sync)]
+    fn copy_range_within<T: TensorValue>(&self, dst: &mut Self::Buf<T>, src: &Self::Buf<T>, dst_offset: usize, src_offset: usize, len: usize) -> Result<(), TensorError>{unreachable!("Macro implmented")}
+    
+    #[rpc(sync)]
+    fn read<T: TensorValue>(&self, buf: &Self::Buf<T>, offset: usize) -> Result<T, crate::core::tensor::TensorError> {unreachable!("Macro implmented")}
+    
+    #[rpc(sync)]
+    fn write<T: TensorValue>(&self, buf: &mut Self::Buf<T>, offset: usize, value: T) -> Result<(), crate::core::tensor::TensorError> {unreachable!("Macro implmented")}
+    #[rpc(skip)] // skip because the pattern is different when not Result
     fn len<T: TensorValue>(&self, buf: &Self::Buf<T>) -> usize {
         let message = Messages::Len {
-            buf: buf.to_typeless(),
+            buf: buf.into(),
         };
         let receiver = self.send_message(message);
         match receiver.recv() {
-            Ok(Messages::LenResponse { len }) => len,
+            Ok(Messages::LenResponse(len)) => {len},
             _ => panic!("Failed to get buffer length or unexpected response"),
         }
     }
 
-    fn copy<T: TensorValue>(&self, src: &Self::Buf<T>) -> Result<Self::Buf<T>, crate::core::tensor::TensorError> {
-        self.pending.sync();
-        let message = Messages::Copy {
-            src: src.to_typeless(),
-        };
-        send_recv!(self, message, Messages::CopyResponse { buf } => {
-            Ok(RemoteBuf::from_typeless(buf?))
-        })
-    }
-
-    fn dump<T: TensorValue>(&self, src: &Self::Buf<T>) -> Result<Box<[T]>, crate::core::tensor::TensorError> {
-        self.pending.sync();
-        let message = Messages::Dump {
-            src: src.to_typeless(),
-        };
-        send_recv!(self, message, Messages::DumpResponse { data } => {
-            data?.to_boxed_slice::<T>()
-        })
-    }
-
+    #[rpc(sync)]
+    fn copy<T: TensorValue>(&self, src: &Self::Buf<T>) -> Result<Self::Buf<T>, crate::core::tensor::TensorError>{unreachable!("Macro implmented")}
+    
+    #[rpc(sync)]
+    fn dump<T: TensorValue>(&self, src: &Self::Buf<T>) -> Result<Box<[T]>, crate::core::tensor::TensorError>{unreachable!("Macro implmented")}
+    
     fn broadcast<T: TensorValue>(
         &self,
         left: (*const Self::Buf<T>, &crate::core::MetaTensor), 
         right: (*const Self::Buf<T>, &crate::core::MetaTensor),
         dst: (*mut Self::Buf<T>, &crate::core::MetaTensor),
         op: crate::ops::base::BinaryOpType
-    ) -> Result<(), crate::core::tensor::TensorError> {
-        let message = unsafe {            
-            Messages::Broadcast {
-                left: ((&*left.0).to_typeless(), left.1.clone()),
-                right: ((&*right.0).to_typeless(), right.1.clone()),
-                dst: ((&*dst.0).to_typeless(), dst.1.clone()),
-                op,
-            }
-        };
-        send_recv!(self, message, Messages::BroadcastResponse { result } => result)
-    }
-
+    ) -> Result<(), crate::core::tensor::TensorError>{unreachable!("Macro implmented")}
     fn apply_elementwise_binary_contiguous<T: TensorValue>(
-        &self, buf: &mut Self::Buf<T>, 
+        &self, 
+        buf: &mut Self::Buf<T>, 
         op: (crate::ops::base::BinaryOpType, T), 
         start: usize,
         len: usize
-    ) -> Result<(), crate::core::tensor::TensorError> {
-        let message = Messages::ApplyElementwiseBinaryContiguous {
-            buf: buf.to_typeless(),
-            op: make_op!(op.0, op.1),
-            start,
-            len,
-        };
-        send_recv!(self, message, Messages::ApplyElementwiseBinaryContiguousResponse { result } => result)
-    }
-
+    ) -> Result<(), crate::core::tensor::TensorError>{unreachable!("Macro implmented")}
     fn apply_elementwise_binary_1d_strided<T: TensorValue>(
         &self, buf: &mut Self::Buf<T>, 
         op: (crate::ops::base::BinaryOpType, T), 
         offset: usize,
         stride: isize,
         len: usize
-    ) -> Result<(), crate::core::tensor::TensorError> {
-        let message = Messages::ApplyElementwiseBinary1DStrided {
-            buf: buf.to_typeless(),
-            op: make_op!(op.0, op.1),
-            offset,
-            stride,
-            len,
-        };
-        send_recv!(self, message, Messages::ApplyElementwiseBinary1DStridedResponse { result } => result)
-    }
-    
+    ) -> Result<(), crate::core::tensor::TensorError>{unreachable!("Macro implmented")}
     fn apply_elementwise_binary_nd<T: TensorValue>(
         &self,
         buf: &mut Self::Buf<T>,
@@ -341,103 +282,37 @@ impl Backend for RemoteBackend {
         offset: usize,
         shape: &[usize],
         stride: &[isize],
-    ) -> Result<(), TensorError> {
-        let message = Messages::ApplyElementwiseBinaryND {
-            buf: buf.to_typeless(),
-            op: make_op!(op.0, op.1),
-            offset,
-            shape: shape.to_vec(),
-            stride: stride.to_vec(),
-        };
-        send_recv!(self, message, Messages::ApplyElementwiseBinaryNDResponse { result } => result)
-    }
-    
+    ) -> Result<(), TensorError>{unreachable!("Macro implmented")}
     fn apply_neg_contiguous<T: TensorValue>(
         &self, buf: &mut Self::Buf<T>, 
         start: usize,
         len: usize
-    ) -> Result<(), TensorError> {
-        // async jon
-        let message = Messages::ApplyNegContiguous {
-            buf: buf.to_typeless(),
-            start,
-            len,
-        };
-        send_recv!(self, message, Messages::ApplyNegContiguousResponse { result } => result)
-    }
-    
+    ) -> Result<(), TensorError>{unreachable!("Macro implmented")}
     fn apply_neg_1d_strided<T: TensorValue>(
         &self, buf: &mut Self::Buf<T>, 
         offset: usize,
         stride: isize,
         len: usize
-    ) -> Result<(), TensorError> {
-        let message = Messages::ApplyNeg1DStrided {
-            buf: buf.to_typeless(),
-            offset,
-            stride,
-            len,
-        };
-        send_recv!(self, message, Messages::ApplyNeg1DStridedResponse { result } => result)
-    }
-    
+    ) -> Result<(), TensorError> {unreachable!("Macro implmented")}
     fn apply_neg_nd<T: TensorValue>(
         &self,
         buf: &mut Self::Buf<T>,
         offset: usize,
         shape: &[usize],
         stride: &[isize],
-    ) -> Result<(), TensorError> {
-        let message = Messages::ApplyNegND {
-            buf: buf.to_typeless(),
-            offset,
-            shape: shape.to_vec(),
-            stride: stride.to_vec(),
-        };
-        send_recv!(self, message, Messages::ApplyNegNDResponse { result } => result)
-    }
-    
-    fn apply_relu_nd<T:TensorValue>(&self,buf: &mut Self::Buf<T>,offset:usize,shape: &[usize],stride: &[isize],) -> Result<(),TensorError>  {
-        todo!()
-    }
-    
-    fn apply_relu_1d_strided<T:TensorValue>(&self,buf: &mut Self::Buf<T>,offset:usize,stride:isize,len:usize) -> Result<(),TensorError>  {
-        todo!()
-    }
-    
-    fn apply_relu_contiguous<T:TensorValue>(&self,buf: &mut Self::Buf<T>,start:usize,len:usize) -> Result<(),TensorError>  {
-        todo!()
-    }
-    
-    fn apply_sigmoid_nd<T:TensorValue>(&self,buf: &mut Self::Buf<T>,offset:usize,shape: &[usize],stride: &[isize],) -> Result<(),TensorError>where T:InvExp {
-        todo!()
-    }
-    
-    fn apply_sigmoid_1d_strided<T:TensorValue>(&self,buf: &mut Self::Buf<T>,offset:usize,stride:isize,len:usize) -> Result<(),TensorError>where T:InvExp {
-        todo!()
-    }
-    
-    fn apply_sigmoid_contiguous<T:TensorValue>(&self,buf: &mut Self::Buf<T>,start:usize,len:usize) -> Result<(),TensorError>where T:InvExp {
-        todo!()
-    }
-    
-    fn apply_tanh_nd<T:TensorValue>(&self,buf: &mut Self::Buf<T>,offset:usize,shape: &[usize],stride: &[isize],) -> Result<(),TensorError>where T:Exp {
-        todo!()
-    }
-    
-    fn apply_tanh_1d_strided<T:TensorValue>(&self,buf: &mut Self::Buf<T>,offset:usize,stride:isize,len:usize) -> Result<(),TensorError>where T:Exp {
-        todo!()
-    }
-    
-    fn apply_tanh_contiguous<T:TensorValue>(&self,buf: &mut Self::Buf<T>,start:usize,len:usize) -> Result<(),TensorError>where T:Exp {
-        todo!()
-    }
-    
-    fn copy_range_within<T: TensorValue>(&self, buf: &mut Self::Buf<T>, src: &Self::Buf<T>, dst_offset: usize, src_offset: usize, len: usize) -> Result<(), TensorError> {
-        todo!()
-    }
+    ) -> Result<(), TensorError>{unreachable!("Macro implmented")}
+    fn apply_relu_nd<T:TensorValue>(&self,buf: &mut Self::Buf<T>,offset:usize,shape: &[usize],stride: &[isize],) -> Result<(),TensorError> {unreachable!("Macro implmented")}
+    fn apply_relu_1d_strided<T:TensorValue>(&self,buf: &mut Self::Buf<T>,offset:usize,stride:isize,len:usize) -> Result<(),TensorError>{unreachable!("Macro implmented")}
+    fn apply_relu_contiguous<T:TensorValue>(&self,buf: &mut Self::Buf<T>,offset:usize,len:usize) -> Result<(),TensorError> {unreachable!("Macro implmented")}
+    fn apply_sigmoid_nd<T:TensorValue>(&self,buf: &mut Self::Buf<T>,offset:usize,shape: &[usize],stride: &[isize],) -> Result<(),TensorError>where T:InvExp {unreachable!("Macro implmented")}
+    fn apply_sigmoid_1d_strided<T:TensorValue>(&self,buf: &mut Self::Buf<T>,offset:usize,stride:isize,len:usize) -> Result<(),TensorError>where T:InvExp {unreachable!("Macro implmented")}
+    fn apply_sigmoid_contiguous<T:TensorValue>(&self,buf: &mut Self::Buf<T>, offset:usize, len:usize) -> Result<(),TensorError>where T:InvExp {unreachable!("Macro implmented")}
+    fn apply_tanh_nd<T:TensorValue>(&self,buf: &mut Self::Buf<T>,offset:usize,shape: &[usize],stride: &[isize],) -> Result<(),TensorError>where T:Exp {unreachable!("Macro implmented")}
+    fn apply_tanh_1d_strided<T:TensorValue>(&self,buf: &mut Self::Buf<T>,offset:usize,stride:isize,len:usize) -> Result<(),TensorError>where T:Exp {unreachable!("Macro implmented")}
+    fn apply_tanh_contiguous<T:TensorValue>(&self,buf: &mut Self::Buf<T>,offset:usize,len:usize) -> Result<(),TensorError>where T:Exp {unreachable!("Macro implmented")}
 }
 
+#[rpc_proc::routines(Messages)]
 impl<T: TensorValue> BackendMatMul<T> for RemoteBackend {
     fn matmul(
         &self,
@@ -449,19 +324,7 @@ impl<T: TensorValue> BackendMatMul<T> for RemoteBackend {
         k: usize,
         n: usize,
         contiguity: crate::core::meta::ContiguityTypes,
-    ) -> Result<(), TensorError> {
-        let message: Messages = Messages::Matmul {
-            lhs: (lhs.0.to_typeless(), lhs.1.clone()),
-            rhs: (rhs.0.to_typeless(), rhs.1.clone()),
-            dst: dst.to_typeless(),
-            b,
-            m,
-            k,
-            n,
-            contiguity,
-        };
-        send_recv!(self, message, Messages::MatmulResponse { result } => result)
-    }
+    ) -> Result<(), TensorError> {unreachable!("Macro implmented")}
 }
 
 #[inline]

@@ -1,12 +1,3 @@
-#[cfg(feature = "remote")]
-use std::net::IpAddr;
-#[cfg(feature = "remote")]
-use std::{collections::HashMap, sync::Mutex};
-#[cfg(feature = "remote")]
-use std::sync::OnceLock;
-
-use crate::backend::remote::client::RemoteBackend;
-
 #[macro_use]
 pub mod server;
 pub mod client;
@@ -16,36 +7,45 @@ mod enumdispatch;
 mod remote_tests;
 
 
-#[cfg(feature = "remote")]
-static REMOTE_BACKENDS: OnceLock<Mutex<HashMap<String, RemoteBackend>>> = OnceLock::new();
-#[cfg(feature = "remote")]
-pub fn remote_backend_init(ip: IpAddr, port: u16) -> RemoteBackend {
-    let key = format!("{ip}:{port}");
+pub mod remote {
+    use std::net::IpAddr;
+    use std::{collections::HashMap, sync::Mutex};
+    use std::sync::OnceLock;
 
-    let map = REMOTE_BACKENDS
-        .get_or_init(|| Mutex::new(HashMap::new()));
+    use crate::backend::remote::client::RemoteBackend;
 
-    let mut guard = map.lock().unwrap();
+    static REMOTE_BACKENDS: OnceLock<Mutex<HashMap<String, RemoteBackend>>> = OnceLock::new();
 
-    guard.entry(key.clone()).or_insert_with(|| {
-        let mut backend = RemoteBackend::new_with_address(ip, port).unwrap();
-        backend.connect().unwrap();
-        backend
-    });
+    pub fn use_remote_backend(ip: IpAddr, port: u16) -> RemoteBackend {
+        let key = format!("{ip}:{port}");
 
-    guard.get(&key).unwrap().clone()
-}
+        let map = REMOTE_BACKENDS
+            .get_or_init(|| Mutex::new(HashMap::new()));
 
-#[cfg(feature = "remote")]
-pub fn get_backend_default() -> Option<RemoteBackend> {
-    if REMOTE_BACKENDS.get().is_none() {
-        remote_backend_init("127.0.0.1".parse().unwrap(), 7878);
+        let mut guard = map.lock().unwrap();
+
+        guard.entry(key.clone()).or_insert_with(|| {
+            let mut backend = RemoteBackend::new_with_address(ip, port).unwrap();
+            backend.connect().unwrap();
+            backend
+        });
+
+        guard.get(&key).unwrap().clone()
     }
-    REMOTE_BACKENDS
-        .get()
-        .and_then(|m| m.lock().ok())
-        .and_then(|map| map.values().next().cloned())
+
+    pub fn get_backend_default() -> Option<RemoteBackend> {
+        if REMOTE_BACKENDS.get().is_none() {
+            use_remote_backend("127.0.0.1".parse().unwrap(), 7878);
+        }
+        REMOTE_BACKENDS
+            .get()
+            .and_then(|m| m.lock().ok())
+            .and_then(|map| map.values().next().cloned())
+    }
 }
+
+pub use remote::*;
+
 
 #[cfg(test)]
 mod tests {

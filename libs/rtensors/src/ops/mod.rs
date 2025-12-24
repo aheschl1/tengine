@@ -5092,7 +5092,7 @@ mod cuda_tests {
 mod remote_tests {
     use std::{ops::Add, sync::OnceLock, thread};
 
-    use crate::{backend::{remote::{client::RemoteBackend, get_backend_default, server::RemoteServer}, Backend}, core::{primitives::{RemoteTensor, TensorBase}, tensor::{AsView, AsViewMut, TensorAccess, TensorAccessMut, TensorError}, value::TensorValue, MetaTensor, MetaTensorView, Shape, Tensor}};
+    use crate::{backend::{remote::{self, client::RemoteBackend, server::RemoteServer}, Backend}, core::{primitives::{RemoteTensor, TensorBase}, tensor::{AsView, AsViewMut, TensorAccess, TensorAccessMut, TensorError}, value::TensorValue, MetaTensor, MetaTensorView, Shape, Tensor}};
 
 
     // Lazy static backend shared across all tests
@@ -5109,7 +5109,7 @@ mod remote_tests {
             thread::sleep(std::time::Duration::from_millis(10));
 
             // Create and connect the backend
-            let backend = get_backend_default().unwrap();
+            let backend = remote::get_backend_default().unwrap();
             
             backend
         }).clone()

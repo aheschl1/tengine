@@ -2,5 +2,6 @@
 [workspace]
 resolver = "3"
 members = [
-    "lib",
+    "libs/rtensors",
+    "libs/rpc_proc"
 ]
