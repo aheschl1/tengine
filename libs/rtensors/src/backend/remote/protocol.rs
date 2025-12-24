@@ -223,76 +223,58 @@ pub (crate) enum Messages {
     },
 
     AllocFromSlice {
-        slice: Slice
+        src: Slice
     },
-    AllocFromSliceResponse {
-        buf: Result<TypelessBuf, TensorError>
-    },
+    AllocFromSliceResponse(Result<TypelessBuf, TensorError>),
     
     Alloc {
         len: usize,
         dtype: DType,
     },
-    AllocResponse {
-        buf: Result<TypelessBuf, TensorError>
-    },
+    AllocResponse (Result<TypelessBuf, TensorError>),
 
     CopyFromSlice {
         dst: TypelessBuf,
         src: Slice
     },
-    CopyFromSliceResponse {
-        result: Result<(), TensorError>
-    },
+    CopyFromSliceResponse (Result<(), TensorError>),
 
     Read {
         buf: TypelessBuf,
         offset: usize,
     },
-    ReadResponse {
-        value: Result<Value, TensorError>,
-    },
+    ReadResponse (Result<Value, TensorError>,),
 
     Write {
         buf: TypelessBuf,
         offset: usize,
         value: Value,
     },
-    WriteResponse {
-        result: Result<(), TensorError>,
-    },
+    WriteResponse (Result<(), TensorError>),
 
     Len {
         buf: TypelessBuf,
     },
-    LenResponse {
-        len: usize,
-    },
+    LenResponse (usize),
 
     Copy {
         src: TypelessBuf,
     },
-    CopyResponse {
-        buf: Result<TypelessBuf, TensorError>,
-    },
+    CopyResponse(Result<TypelessBuf, TensorError>),
 
     Dump {
         src: TypelessBuf,
     },
-    DumpResponse {
-        data: Result<Slice, TensorError>,
-    },
+    DumpResponse (Result<Slice, TensorError>),
 
-    ApplyElementwiseBinary1DStrided {
+    ApplyElementwiseBinary1dStrided {
         buf: TypelessBuf,
         op: (BinaryOpType, Value),
         offset: usize,
         stride: isize,
         len: usize,
     },
-    ApplyElementwiseBinary1DStridedResponse {
-        result: Result<(), TensorError>,
-    },
+    ApplyElementwiseBinary1dStridedResponse (Result<(), TensorError>),
 
     ApplyElementwiseBinaryContiguous {
         buf: TypelessBuf,
@@ -300,20 +282,16 @@ pub (crate) enum Messages {
         start: usize,
         len: usize,
     },
-    ApplyElementwiseBinaryContiguousResponse {
-        result: Result<(), TensorError>,
-    },
+    ApplyElementwiseBinaryContiguousResponse (Result<(), TensorError>),
 
-    ApplyElementwiseBinaryND {
+    ApplyElementwiseBinaryNd {
         buf: TypelessBuf,
         op: (BinaryOpType, Value),
         offset: usize,
         shape: Vec<usize>,
         stride: Vec<isize>,
     },
-    ApplyElementwiseBinaryNDResponse {
-        result: Result<(), TensorError>,
-    },
+    ApplyElementwiseBinaryNdResponse (Result<(), TensorError>),
 
     Broadcast {
         left: (TypelessBuf, MetaTensor),
@@ -321,55 +299,43 @@ pub (crate) enum Messages {
         dst: (TypelessBuf, MetaTensor),
         op: BinaryOpType,
     },
-    BroadcastResponse {
-        result: Result<(), TensorError>,
-    },
+    BroadcastResponse (Result<(), TensorError>),
 
     ApplyElementwiseBinary {
         buf: TypelessBuf,
         op: (BinaryOpType, Value),
         meta: MetaTensor,
     },
-    ApplyElementwiseBinaryResponse {
-        result: Result<(), TensorError>,
-    },
+    ApplyElementwiseBinaryResponse (Result<(), TensorError>),
 
     ApplyNegContiguous {
         buf: TypelessBuf,
         start: usize,
         len: usize,
     },
-    ApplyNegContiguousResponse {
-        result: Result<(), TensorError>,
-    },
+    ApplyNegContiguousResponse (Result<(), TensorError>),
 
-    ApplyNeg1DStrided {
+    ApplyNeg1dStrided {
         buf: TypelessBuf,
         offset: usize,
         stride: isize,
         len: usize,
     },
-    ApplyNeg1DStridedResponse {
-        result: Result<(), TensorError>,
-    },
+    ApplyNeg1dStridedResponse (Result<(), TensorError>),
 
-    ApplyNegND {
+    ApplyNegNd {
         buf: TypelessBuf,
         offset: usize,
         shape: Vec<usize>,
         stride: Vec<isize>,
     },
-    ApplyNegNDResponse {
-        result: Result<(), TensorError>,
-    },
+    ApplyNegNdResponse (Result<(), TensorError>),
 
     ApplyNeg {
         buf: TypelessBuf,
         meta: MetaTensor,
     },
-    ApplyNegResponse {
-        result: Result<(), TensorError>,
-    },
+    ApplyNegResponse (Result<(), TensorError>),
 
     Matmul {
         lhs: (TypelessBuf, MetaTensor),
@@ -381,13 +347,78 @@ pub (crate) enum Messages {
         n: usize,
         contiguity: ContiguityTypes
     },
-    MatmulResponse {
-        result: Result<(), TensorError>,
-    },
+    MatmulResponse (Result<(), TensorError>),
 
-    ActionCompleted {
-        task_id: u32,
-    }
+    ApplyReluNd {
+        buf: TypelessBuf,
+        offset: usize,
+        shape: Vec<usize>,
+        stride: Vec<isize>
+    },
+    ApplyReluNdResponse(Result<(), TensorError>),
+
+    ApplyRelu1dStrided {
+        buf: TypelessBuf,
+        offset: usize,
+        stride: isize,
+        len: usize,
+    },
+    ApplyRelu1dStridedResponse(Result<(), TensorError>),
+
+    ApplyReluContiguous {
+        buf: TypelessBuf,
+        offset: usize,
+        len: usize,
+    },
+    ApplyReluContiguousResponse(Result<(), TensorError>),
+
+    ApplySigmoidNd {
+        buf: TypelessBuf,
+        offset: usize,
+        shape: Vec<usize>,
+        stride: Vec<isize>
+    },
+    ApplySigmoidNdResponse(Result<(), TensorError>),
+
+    ApplySigmoid1dStrided {
+        buf: TypelessBuf,
+        offset: usize,
+        stride: isize,
+        len: usize,
+    },
+    ApplySigmoid1dStridedResponse(Result<(), TensorError>),
+
+    ApplySigmoidContiguous {
+        buf: TypelessBuf,
+        offset: usize,
+        len: usize,
+    },
+    ApplySigmoidContiguousResponse(Result<(), TensorError>),
+
+    ApplyTanhNd {
+        buf: TypelessBuf,
+        offset: usize,
+        shape: Vec<usize>,
+        stride: Vec<isize>
+    },
+    ApplyTanhNdResponse(Result<(), TensorError>),
+
+    ApplyTanh1dStrided {
+        buf: TypelessBuf,
+        offset: usize,
+        stride: isize,
+        len: usize,
+    },
+    ApplyTanh1dStridedResponse(Result<(), TensorError>),
+
+    ApplyTanhContiguous {
+        buf: TypelessBuf,
+        offset: usize,
+        len: usize,
+    },
+    ApplyTanhContiguousResponse(Result<(), TensorError>),
+
+    ActionCompleted(u32)
 
 }
 
@@ -404,15 +435,15 @@ impl Messages {
             Messages::LenResponse { .. } |
             Messages::CopyResponse { .. } |
             Messages::DumpResponse { .. } |
-            Messages::ApplyElementwiseBinary1DStridedResponse { .. } |
+            Messages::ApplyElementwiseBinary1dStridedResponse { .. } |
             Messages::ApplyElementwiseBinaryContiguousResponse { .. } |
-            Messages::ApplyElementwiseBinaryNDResponse { .. } |
+            Messages::ApplyElementwiseBinaryNdResponse { .. } |
             Messages::BroadcastResponse { .. } |
             Messages::ApplyElementwiseBinaryResponse { .. } |
             Messages::MatmulResponse { .. } |
-            Messages::ApplyNeg1DStridedResponse { .. } |
+            Messages::ApplyNeg1dStridedResponse { .. } |
             Messages::ApplyNegContiguousResponse { .. } |
-            Messages::ApplyNegNDResponse { .. } |
+            Messages::ApplyNegNdResponse { .. } |
             Messages::ErrorResponse { .. } |
             Messages::ActionCompleted { .. } |
             Messages::ApplyNegResponse { .. } => true,
