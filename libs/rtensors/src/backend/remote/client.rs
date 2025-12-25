@@ -187,6 +187,87 @@ impl RemoteBackend {
 
 }
 
+#[inline]
+fn read_response(stream: &mut std::net::TcpStream, len_buf: &mut  [u8; 4]) -> Result<Response, Box<bincode::ErrorKind>> {
+    stream.read_exact(len_buf).unwrap();
+    let msg_len = u32::from_le_bytes(*len_buf) as usize;
+    let mut msg_buf = vec![0u8; msg_len];
+    stream.read_exact(&mut msg_buf).unwrap();
+    Response::deserialize(&msg_buf)
+}
+
+#[inline]
+fn send_message_to_channel(remote: &RemoteBackend, msg: Response) {
+    let task_id = msg.task_id;
+    let sender = {
+        let mut pending = remote.pending_response.write().unwrap();
+        pending.remove(&task_id)
+    };
+    if let Some(sender) = sender {
+        sender.send(msg.message).unwrap();
+    }
+}
+
+// todo, make this async
+
+/// Thread function to drain outgoing messages and send them over the TCP stream
+/// # Arguments
+/// * `remote` - The RemoteBackend instance
+/// * `stream` - The TCP stream to send messages over
+fn drain_outgoing(remote: RemoteBackend, mut stream: std::net::TcpStream) {
+    let receiver = remote.messages_outgoing_receiver.clone();
+    loop {        
+        if let Ok(req) = receiver.recv() {
+            if remote.is_poisoned() {
+                break;
+            }
+            let serialized = req.serialize().unwrap();
+            let n = serialized.len();
+            let n_bytes = (n as u32).to_le_bytes();
+            stream.write_all(&n_bytes).unwrap();
+            stream.write_all(&serialized).unwrap();
+        } else {
+            // Channel closed, exit thread
+            break;
+        }
+    }
+}
+
+/// Thread function to read incoming messages from the TCP stream
+/// 
+/// Upon receiving a message, if it is marked as not asynchronous, it sends the message to the waiting channel
+/// Otherwise, it handles asynchronous messages accordingly. If the asynchronous message is complete and does not
+/// indicate an error, it simply decrements the pending count. If it indicates an error, it poisons the RemoteBackend to prevent further operations.
+/// If the asynchronous message is not complete, it sends a follow-up message to the waiting channel, and does not decrement the pending count.
+/// 
+/// # Arguments
+/// * `remote` - The RemoteBackend instance
+/// * `stream` - The TCP stream to read messages from
+fn read_incoming(remote: RemoteBackend, mut stream: std::net::TcpStream) {
+    let mut len_buf = [0u8; 4];
+    loop {
+        let msg = read_response(&mut stream, &mut len_buf).unwrap();
+        if !msg.asynchronous {
+            debug_assert!(msg.complete);
+            send_message_to_channel(&remote, msg);
+            remote.pending.dec();
+        }else if msg.complete {
+            // no need to send follow up, just decrement pending. because, there was an incomplete one before
+            // that sent the message. async followup is just a backend notification.
+            // nobody waits on follow up of async
+            if let Some(e) = msg.error {
+                remote.poison();
+                panic!("Inconsistent state detected. Received error in async message: {:?}", e);
+            } 
+            remote.pending.dec();
+        }else{
+            //send initial follow up to receiver, do not decrement pending yet
+            send_message_to_channel(&remote, msg);
+        }
+    }
+}
+
+
 // macro_rules! send_recv {
 //     ($self:expr, $message:expr, $response_pattern:pat => $result:expr) => {{
 //         let receiver = $self.send_message($message);
@@ -325,84 +406,4 @@ impl<T: TensorValue> BackendMatMul<T> for RemoteBackend {
         n: usize,
         contiguity: crate::core::meta::ContiguityTypes,
     ) -> Result<(), TensorError> {unreachable!("Macro implmented")}
-}
-
-#[inline]
-fn read_response(stream: &mut std::net::TcpStream, len_buf: &mut  [u8; 4]) -> Result<Response, Box<bincode::ErrorKind>> {
-    stream.read_exact(len_buf).unwrap();
-    let msg_len = u32::from_le_bytes(*len_buf) as usize;
-    let mut msg_buf = vec![0u8; msg_len];
-    stream.read_exact(&mut msg_buf).unwrap();
-    Response::deserialize(&msg_buf)
-}
-
-#[inline]
-fn send_message_to_channel(remote: &RemoteBackend, msg: Response) {
-    let task_id = msg.task_id;
-    let sender = {
-        let mut pending = remote.pending_response.write().unwrap();
-        pending.remove(&task_id)
-    };
-    if let Some(sender) = sender {
-        sender.send(msg.message).unwrap();
-    }
-}
-
-// todo, make this async
-
-/// Thread function to drain outgoing messages and send them over the TCP stream
-/// # Arguments
-/// * `remote` - The RemoteBackend instance
-/// * `stream` - The TCP stream to send messages over
-fn drain_outgoing(remote: RemoteBackend, mut stream: std::net::TcpStream) {
-    let receiver = remote.messages_outgoing_receiver.clone();
-    loop {        
-        if let Ok(req) = receiver.recv() {
-            if remote.is_poisoned() {
-                break;
-            }
-            let serialized = req.serialize().unwrap();
-            let n = serialized.len();
-            let n_bytes = (n as u32).to_le_bytes();
-            stream.write_all(&n_bytes).unwrap();
-            stream.write_all(&serialized).unwrap();
-        } else {
-            // Channel closed, exit thread
-            break;
-        }
-    }
-}
-
-/// Thread function to read incoming messages from the TCP stream
-/// 
-/// Upon receiving a message, if it is marked as not asynchronous, it sends the message to the waiting channel
-/// Otherwise, it handles asynchronous messages accordingly. If the asynchronous message is complete and does not
-/// indicate an error, it simply decrements the pending count. If it indicates an error, it poisons the RemoteBackend to prevent further operations.
-/// If the asynchronous message is not complete, it sends a follow-up message to the waiting channel, and does not decrement the pending count.
-/// 
-/// # Arguments
-/// * `remote` - The RemoteBackend instance
-/// * `stream` - The TCP stream to read messages from
-fn read_incoming(remote: RemoteBackend, mut stream: std::net::TcpStream) {
-    let mut len_buf = [0u8; 4];
-    loop {
-        let msg = read_response(&mut stream, &mut len_buf).unwrap();
-        if !msg.asynchronous {
-            debug_assert!(msg.complete);
-            send_message_to_channel(&remote, msg);
-            remote.pending.dec();
-        }else if msg.complete {
-            // no need to send follow up, just decrement pending. because, there was an incomplete one before
-            // that sent the message. async followup is just a backend notification.
-            // nobody waits on follow up of async
-            if let Some(e) = msg.error {
-                remote.poison();
-                panic!("Inconsistent state detected. Received error in async message: {:?}", e);
-            } 
-            remote.pending.dec();
-        }else{
-            //send initial follow up to receiver, do not decrement pending yet
-            send_message_to_channel(&remote, msg);
-        }
-    }
 }

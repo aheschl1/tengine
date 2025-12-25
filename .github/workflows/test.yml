@@ -10,7 +10,7 @@ on:
 
 jobs:
   test:
-    name: Run Tests (CPU only)
+    name: Run Tests (CPU only w. remote)
     runs-on: ubuntu-latest
     
     steps:
@@ -48,8 +48,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-target-
       
-      - name: Build (CPU only)
-        run: cargo build --verbose --no-default-features
+      - name: Build (CPU only w. remote)
+        run: cargo build --verbose --features remote
       
-      - name: Run tests (CPU only)
-        run: cargo test --verbose --no-default-features
+      - name: Run tests (CPU only w. remote)
+        run: cargo test --verbose --features remote

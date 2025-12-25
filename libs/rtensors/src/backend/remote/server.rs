@@ -653,81 +653,9 @@ macro_rules! copy_within_for_dtype {
     }};
 }
 
-pub(crate) enum AsyncJob {
-    CopyFromSlice {
-        task_id: u32,
-        dst: TypelessBuf,
-        src: Slice,
-    },
-    ApplyElementwiseContiguous {
-        task_id: u32,
-        buf: TypelessBuf,
-        op: (crate::ops::base::BinaryOpType, crate::backend::remote::protocol::Value),
-        start: usize,
-        len: usize,
-    },
-    ApplyElementwise1dStrided {
-        task_id: u32,
-        buf: TypelessBuf,
-        op: (crate::ops::base::BinaryOpType, crate::backend::remote::protocol::Value),
-        offset: usize,
-        stride: isize,
-        len: usize,
-    },
-    ApplyElementwiseNd {
-        task_id: u32,
-        buf: TypelessBuf,
-        op: (crate::ops::base::BinaryOpType, crate::backend::remote::protocol::Value),
-        offset: usize,
-        shape: Vec<usize>,
-        stride: Vec<isize>,
-    },
-    CopyRangeWithin {
-        task_id: u32,
-        dst: TypelessBuf,
-        src: TypelessBuf,
-        dst_offset: usize,
-        src_offset: usize,
-        len: usize,
-    },
-    ApplyNegContiguous {
-        task_id: u32,
-        buf: TypelessBuf,
-        start: usize,
-        len: usize,
-    },
-    ApplyNeg1dStrided {
-        task_id: u32,
-        buf: TypelessBuf,
-        offset: usize,
-        stride: isize,
-        len: usize,
-    },
-    ApplyNegNd {
-        task_id: u32,
-        buf: TypelessBuf,
-        offset: usize,
-        shape: Vec<usize>,
-        stride: Vec<isize>,
-    },
-    Broadcast {
-        task_id: u32,
-        left: (TypelessBuf, MetaTensor),
-        right: (TypelessBuf, MetaTensor),
-        dst: (TypelessBuf, MetaTensor),
-        op: crate::ops::base::BinaryOpType,
-    },
-    MatMul {
-        task_id: u32,
-        lhs: (TypelessBuf, MetaTensor),
-        rhs: (TypelessBuf, MetaTensor),
-        dst: TypelessBuf,
-        b: usize,
-        m: usize,
-        k: usize,
-        n: usize,
-        contiguity: ContiguityTypes
-    },
+pub (crate) struct AsyncJob {
+    task_id: u32,
+    job: Messages
 }
 
 
@@ -747,9 +675,11 @@ fn handle_request(
             };
             connection.queue_response(response).expect("Failed to send message");
 
-            let job = AsyncJob::$job_type {
+            let job = AsyncJob {
                 task_id: request.task_id,
-                $($args)*
+                job: Messages::$job_type {
+                    $($args)*
+                }
             };
             connection.queue_job(job).expect("Failed to queue job");
         };
@@ -804,19 +734,19 @@ fn handle_request(
             sync_job!(Messages::DumpResponse (slice), err: slice.as_ref().err().cloned());
         }
         Messages::ApplyElementwiseBinaryContiguous { buf, op, start, len } => {
-            async_job!(ack: ApplyElementwiseBinaryContiguousResponse, job: ApplyElementwiseContiguous, buf, op, start, len);
+            async_job!(ack: ApplyElementwiseBinaryContiguousResponse, job: ApplyElementwiseBinaryContiguous, buf, op, start, len);
         }
         Messages::ApplyElementwiseBinary1dStrided { buf, op, offset, stride, len } => {
-            async_job!(ack: ApplyElementwiseBinary1dStridedResponse, job: ApplyElementwise1dStrided, buf, op, offset, stride, len);
+            async_job!(ack: ApplyElementwiseBinary1dStridedResponse, job: ApplyElementwiseBinary1dStrided, buf, op, offset, stride, len);
         }
         Messages::ApplyElementwiseBinaryNd { buf, op, offset, shape, stride } => {
-            async_job!(ack: ApplyElementwiseBinaryNdResponse, job: ApplyElementwiseNd, buf, op, offset, shape, stride);
+            async_job!(ack: ApplyElementwiseBinaryNdResponse, job: ApplyElementwiseBinaryNd, buf, op, offset, shape, stride);
         }
         Messages::Broadcast { left, right, dst, op } => { 
             async_job!(ack: BroadcastResponse, job: Broadcast, left, right, dst, op);    
         }
         Messages::Matmul { lhs, rhs, dst, b, m, k, n, contiguity } => {
-            async_job!(ack: MatmulResponse, job: MatMul, lhs, rhs, dst, b, m, k, n, contiguity);
+            async_job!(ack: MatmulResponse, job: Matmul, lhs, rhs, dst, b, m, k, n, contiguity);
         }
         Messages::ApplyNegContiguous { buf, start, len } => {
             async_job!(ack: ApplyNegContiguousResponse, job: ApplyNegContiguous, buf, start, len);
@@ -953,72 +883,63 @@ fn drain_background_jobs(connection: ClientConnection) {
                 break;
             }
         };
-        let task_id = match &job {
-            AsyncJob::CopyFromSlice { task_id, .. } => *task_id,
-            AsyncJob::ApplyElementwiseContiguous { task_id, .. } => *task_id,
-            AsyncJob::ApplyElementwise1dStrided { task_id, .. } => *task_id,
-            AsyncJob::ApplyElementwiseNd { task_id, .. } => *task_id,
-            AsyncJob::Broadcast { task_id, .. } => *task_id,
-            AsyncJob::MatMul { task_id, .. } => *task_id,
-            AsyncJob::ApplyNegContiguous { task_id, .. } => *task_id,
-            AsyncJob::ApplyNeg1dStrided { task_id, .. } => *task_id,
-            AsyncJob::ApplyNegNd { task_id, .. } => *task_id,
-            AsyncJob::CopyRangeWithin { task_id, .. } => *task_id,
-        };
-        let (message, error) = match job {
-            AsyncJob::CopyFromSlice { dst, src, .. } => {
+        let task_id = job.task_id;
+
+        let (message, error) = match job.job {
+            Messages::CopyFromSlice { dst, src, .. } => {
                 let result = dispatch_copy_from_slice(dst, src, &connection);
                 let err = result.as_ref().err().cloned();
                 (Messages::CopyFromSliceResponse(result), err)
             },
-            AsyncJob::ApplyElementwiseContiguous { buf, op, start, len, .. } => {
+            Messages::ApplyElementwiseBinaryContiguous { buf, op, start, len, .. } => {
                 let (op_type, value) = op;
                 let result = dispatch_apply_binary_elementwise_contiguous(buf, op_type, value, start, len, &connection);
                 let err = result.as_ref().err().cloned();
                 (Messages::ApplyElementwiseBinaryContiguousResponse ( result ), err)
             },
-            AsyncJob::ApplyElementwise1dStrided { buf, op, offset, stride, len, .. } => {
+            Messages::ApplyElementwiseBinary1dStrided { buf, op, offset, stride, len, .. } => {
                 let (op_type, value) = op;
                 let result = dispatch_apply_binary_elementwise_1d_strided(buf, op_type, value, offset, stride, len, &connection);
                 let err = result.as_ref().err().cloned();
                 (Messages::ApplyElementwiseBinary1dStridedResponse ( result ), err)
             },
-            AsyncJob::ApplyElementwiseNd { buf, op, offset, shape, stride, .. } => {
+            Messages::ApplyElementwiseBinaryNd { buf, op, offset, shape, stride, .. } => {
                 let (op_type, value) = op;
                 let result = dispatch_apply_binary_elementwise_nd(buf, op_type, value, offset, &shape, &stride, &connection);
                 let err = result.as_ref().err().cloned();
                 (Messages::ApplyElementwiseBinaryNdResponse ( result ), err)
             },
-            AsyncJob::ApplyNegContiguous { buf, start, len, .. } => {
+            Messages::ApplyNegContiguous { buf, start, len, .. } => {
                 let result = dispatch_apply_neg_contiguous(buf, start, len, &connection);
                 let err = result.as_ref().err().cloned();
                 (Messages::ApplyNegContiguousResponse ( result ), err)
             },
-            AsyncJob::ApplyNeg1dStrided { buf, offset, stride, len, .. } => {
+            Messages::ApplyNeg1dStrided { buf, offset, stride, len, .. } => {
                 let result = dispatch_apply_neg_1d_strided(buf, offset, stride, len, &connection);
                 let err = result.as_ref().err().cloned();
                 (Messages::ApplyNeg1dStridedResponse ( result ), err)
             },
-            AsyncJob::ApplyNegNd { buf, offset, shape, stride, .. } => {
+            Messages::ApplyNegNd { buf, offset, shape, stride, .. } => {
                 let result = dispatch_apply_neg_nd(buf, offset, &shape, &stride, &connection);
                 let err = result.as_ref().err().cloned();
                 (Messages::ApplyNegNdResponse ( result ), err)
             },
-            AsyncJob::Broadcast { left, right, dst, op, .. } => {
+            Messages::Broadcast { left, right, dst, op, .. } => {
                 let result = dispatch_broadcast(left, right, dst, op, &connection);
                 let err = result.as_ref().err().cloned();
                 (Messages::BroadcastResponse ( result ), err)
             },
-            AsyncJob::MatMul { lhs, rhs, dst, b, m, k, n, contiguity, .. } => {
+            Messages::Matmul { lhs, rhs, dst, b, m, k, n, contiguity, .. } => {
                 let result = dispatch_matmul(lhs, rhs, dst, b, m, k, n, contiguity, &connection);
                 let err = result.as_ref().err().cloned();
                 (Messages::MatmulResponse ( result ), err)
             },
-            AsyncJob::CopyRangeWithin { dst, src, dst_offset, src_offset, len, .. } => {
+            Messages::CopyRangeWithin { dst, src, dst_offset, src_offset, len, .. } => {
                 let result = dispath_copy_within(dst, src, dst_offset, src_offset, len, &connection);
                 let err = result.as_ref().err().cloned();
                 (Messages::CopyRangeWithinResponse ( result ), err)
-            }
+            },
+            _ => panic!("Not a job for queue")
         };
         let completion_response = Response {
             asynchronous: true,
