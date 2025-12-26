@@ -189,82 +189,79 @@ pub(crate) fn dispatch_dump(
 }
 
 #[inline(always)]
-pub(crate) fn dispatch_apply_binary_elementwise_contiguous(
+pub(crate) fn dispatch_apply_elementwise_binary_contiguous(
     buf: TypelessBuf,
-    op: crate::ops::base::BinaryOpType,
-    value: crate::backend::remote::protocol::Value,
+    op: (crate::ops::base::BinaryOpType, crate::backend::remote::protocol::Value),
     start: usize,
     len: usize,
     connection: &ClientConnection,
 ) -> Result<(), TensorError> {
     match buf.dtype {
-        DType::U8 => apply_elementwise_binary_contiguous_for_dtype!(buf.id, op, value, start, len, connection, u8, u8_buffers),
-        DType::U16 => apply_elementwise_binary_contiguous_for_dtype!(buf.id, op, value, start, len, connection, u16, u16_buffers),
-        DType::U32 => apply_elementwise_binary_contiguous_for_dtype!(buf.id, op, value, start, len, connection, u32, u32_buffers),
-        DType::U64 => apply_elementwise_binary_contiguous_for_dtype!(buf.id, op, value, start, len, connection, u64, u64_buffers),
-        DType::U128 => apply_elementwise_binary_contiguous_for_dtype!(buf.id, op, value, start, len, connection, u128, u128_buffers),
-        DType::I8 => apply_elementwise_binary_contiguous_for_dtype!(buf.id, op, value, start, len, connection, i8, i8_buffers),
-        DType::I16 => apply_elementwise_binary_contiguous_for_dtype!(buf.id, op, value, start, len, connection, i16, i16_buffers),
-        DType::I32 => apply_elementwise_binary_contiguous_for_dtype!(buf.id, op, value, start, len, connection, i32, i32_buffers),
-        DType::I64 => apply_elementwise_binary_contiguous_for_dtype!(buf.id, op, value, start, len, connection, i64, i64_buffers),
-        DType::I128 => apply_elementwise_binary_contiguous_for_dtype!(buf.id, op, value, start, len, connection, i128, i128_buffers),
-        DType::F32 => apply_elementwise_binary_contiguous_for_dtype!(buf.id, op, value, start, len, connection, f32, f32_buffers),
-        DType::F64 => apply_elementwise_binary_contiguous_for_dtype!(buf.id, op, value, start, len, connection, f64, f64_buffers),
-        DType::BOOL => apply_elementwise_binary_contiguous_for_dtype!(buf.id, op, value, start, len, connection, types::boolean, bool_buffers),
+        DType::U8 => apply_elementwise_binary_contiguous_for_dtype!(buf.id, op, start, len, connection, u8, u8_buffers),
+        DType::U16 => apply_elementwise_binary_contiguous_for_dtype!(buf.id, op, start, len, connection, u16, u16_buffers),
+        DType::U32 => apply_elementwise_binary_contiguous_for_dtype!(buf.id, op, start, len, connection, u32, u32_buffers),
+        DType::U64 => apply_elementwise_binary_contiguous_for_dtype!(buf.id, op, start, len, connection, u64, u64_buffers),
+        DType::U128 => apply_elementwise_binary_contiguous_for_dtype!(buf.id, op, start, len, connection, u128, u128_buffers),
+        DType::I8 => apply_elementwise_binary_contiguous_for_dtype!(buf.id, op, start, len, connection, i8, i8_buffers),
+        DType::I16 => apply_elementwise_binary_contiguous_for_dtype!(buf.id, op, start, len, connection, i16, i16_buffers),
+        DType::I32 => apply_elementwise_binary_contiguous_for_dtype!(buf.id, op, start, len, connection, i32, i32_buffers),
+        DType::I64 => apply_elementwise_binary_contiguous_for_dtype!(buf.id, op, start, len, connection, i64, i64_buffers),
+        DType::I128 => apply_elementwise_binary_contiguous_for_dtype!(buf.id, op, start, len, connection, i128, i128_buffers),
+        DType::F32 => apply_elementwise_binary_contiguous_for_dtype!(buf.id, op, start, len, connection, f32, f32_buffers),
+        DType::F64 => apply_elementwise_binary_contiguous_for_dtype!(buf.id, op, start, len, connection, f64, f64_buffers),
+        DType::BOOL => apply_elementwise_binary_contiguous_for_dtype!(buf.id, op, start, len, connection, types::boolean, bool_buffers),
     }
 }
 
 #[inline(always)]
-pub(crate) fn dispatch_apply_binary_elementwise_1d_strided(
+pub(crate) fn dispatch_apply_elementwise_binary_1d_strided(
     buf: TypelessBuf,
-    op: crate::ops::base::BinaryOpType,
-    value: crate::backend::remote::protocol::Value,
+    op: (crate::ops::base::BinaryOpType, crate::backend::remote::protocol::Value),
     offset: usize,
     stride: isize,
     len: usize,
     connection: &ClientConnection,
 ) -> Result<(), TensorError> {
     match buf.dtype {
-        DType::U8 => apply_elementwise_binary_1d_strided_for_dtype!(buf.id, op, value, offset, stride, len, connection, u8, u8_buffers),
-        DType::U16 => apply_elementwise_binary_1d_strided_for_dtype!(buf.id, op, value, offset, stride, len, connection, u16, u16_buffers),
-        DType::U32 => apply_elementwise_binary_1d_strided_for_dtype!(buf.id, op, value, offset, stride, len, connection, u32, u32_buffers),
-        DType::U64 => apply_elementwise_binary_1d_strided_for_dtype!(buf.id, op, value, offset, stride, len, connection, u64, u64_buffers),
-        DType::U128 => apply_elementwise_binary_1d_strided_for_dtype!(buf.id, op, value, offset, stride, len, connection, u128, u128_buffers),
-        DType::I8 => apply_elementwise_binary_1d_strided_for_dtype!(buf.id, op, value, offset, stride, len, connection, i8, i8_buffers),
-        DType::I16 => apply_elementwise_binary_1d_strided_for_dtype!(buf.id, op, value, offset, stride, len, connection, i16, i16_buffers),
-        DType::I32 => apply_elementwise_binary_1d_strided_for_dtype!(buf.id, op, value, offset, stride, len, connection, i32, i32_buffers),
-        DType::I64 => apply_elementwise_binary_1d_strided_for_dtype!(buf.id, op, value, offset, stride, len, connection, i64, i64_buffers),
-        DType::I128 => apply_elementwise_binary_1d_strided_for_dtype!(buf.id, op, value, offset, stride, len, connection, i128, i128_buffers),
-        DType::F32 => apply_elementwise_binary_1d_strided_for_dtype!(buf.id, op, value, offset, stride, len, connection, f32, f32_buffers),
-        DType::F64 => apply_elementwise_binary_1d_strided_for_dtype!(buf.id, op, value, offset, stride, len, connection, f64, f64_buffers),
-        DType::BOOL => apply_elementwise_binary_1d_strided_for_dtype!(buf.id, op, value, offset, stride, len, connection, types::boolean, bool_buffers),
+        DType::U8 => apply_elementwise_binary_1d_strided_for_dtype!(buf.id, op, offset, stride, len, connection, u8, u8_buffers),
+        DType::U16 => apply_elementwise_binary_1d_strided_for_dtype!(buf.id, op, offset, stride, len, connection, u16, u16_buffers),
+        DType::U32 => apply_elementwise_binary_1d_strided_for_dtype!(buf.id, op, offset, stride, len, connection, u32, u32_buffers),
+        DType::U64 => apply_elementwise_binary_1d_strided_for_dtype!(buf.id, op, offset, stride, len, connection, u64, u64_buffers),
+        DType::U128 => apply_elementwise_binary_1d_strided_for_dtype!(buf.id, op, offset, stride, len, connection, u128, u128_buffers),
+        DType::I8 => apply_elementwise_binary_1d_strided_for_dtype!(buf.id, op, offset, stride, len, connection, i8, i8_buffers),
+        DType::I16 => apply_elementwise_binary_1d_strided_for_dtype!(buf.id, op, offset, stride, len, connection, i16, i16_buffers),
+        DType::I32 => apply_elementwise_binary_1d_strided_for_dtype!(buf.id, op, offset, stride, len, connection, i32, i32_buffers),
+        DType::I64 => apply_elementwise_binary_1d_strided_for_dtype!(buf.id, op, offset, stride, len, connection, i64, i64_buffers),
+        DType::I128 => apply_elementwise_binary_1d_strided_for_dtype!(buf.id, op, offset, stride, len, connection, i128, i128_buffers),
+        DType::F32 => apply_elementwise_binary_1d_strided_for_dtype!(buf.id, op, offset, stride, len, connection, f32, f32_buffers),
+        DType::F64 => apply_elementwise_binary_1d_strided_for_dtype!(buf.id, op, offset, stride, len, connection, f64, f64_buffers),
+        DType::BOOL => apply_elementwise_binary_1d_strided_for_dtype!(buf.id, op, offset, stride, len, connection, types::boolean, bool_buffers),
     }
 }
 
 #[inline(always)]
-pub(crate) fn dispatch_apply_binary_elementwise_nd(
+pub(crate) fn dispatch_apply_elementwise_binary_nd(
     buf: TypelessBuf,
-    op: crate::ops::base::BinaryOpType,
-    value: crate::backend::remote::protocol::Value,
+    op: (crate::ops::base::BinaryOpType, crate::backend::remote::protocol::Value),
     offset: usize,
-    shape: &[usize],
-    stride: &[isize],
+    shape: Vec<usize>,
+    stride: Vec<isize>,
     connection: &ClientConnection,
 ) -> Result<(), TensorError> {
     match buf.dtype {
-        DType::U8 => apply_elementwise_binary_nd_for_dtype!(buf.id, op, value, offset, shape, stride, connection, u8, u8_buffers),
-        DType::U16 => apply_elementwise_binary_nd_for_dtype!(buf.id, op, value, offset, shape, stride, connection, u16, u16_buffers),
-        DType::U32 => apply_elementwise_binary_nd_for_dtype!(buf.id, op, value, offset, shape, stride, connection, u32, u32_buffers),
-        DType::U64 => apply_elementwise_binary_nd_for_dtype!(buf.id, op, value, offset, shape, stride, connection, u64, u64_buffers),
-        DType::U128 => apply_elementwise_binary_nd_for_dtype!(buf.id, op, value, offset, shape, stride, connection, u128, u128_buffers),
-        DType::I8 => apply_elementwise_binary_nd_for_dtype!(buf.id, op, value, offset, shape, stride, connection, i8, i8_buffers),
-        DType::I16 => apply_elementwise_binary_nd_for_dtype!(buf.id, op, value, offset, shape, stride, connection, i16, i16_buffers),
-        DType::I32 => apply_elementwise_binary_nd_for_dtype!(buf.id, op, value, offset, shape, stride, connection, i32, i32_buffers),
-        DType::I64 => apply_elementwise_binary_nd_for_dtype!(buf.id, op, value, offset, shape, stride, connection, i64, i64_buffers),
-        DType::I128 => apply_elementwise_binary_nd_for_dtype!(buf.id, op, value, offset, shape, stride, connection, i128, i128_buffers),
-        DType::F32 => apply_elementwise_binary_nd_for_dtype!(buf.id, op, value, offset, shape, stride, connection, f32, f32_buffers),
-        DType::F64 => apply_elementwise_binary_nd_for_dtype!(buf.id, op, value, offset, shape, stride, connection, f64, f64_buffers),
-        DType::BOOL => apply_elementwise_binary_nd_for_dtype!(buf.id, op, value, offset, shape, stride, connection, types::boolean, bool_buffers),
+        DType::U8 => apply_elementwise_binary_nd_for_dtype!(buf.id, op, offset, shape, stride, connection, u8, u8_buffers),
+        DType::U16 => apply_elementwise_binary_nd_for_dtype!(buf.id, op, offset, shape, stride, connection, u16, u16_buffers),
+        DType::U32 => apply_elementwise_binary_nd_for_dtype!(buf.id, op, offset, shape, stride, connection, u32, u32_buffers),
+        DType::U64 => apply_elementwise_binary_nd_for_dtype!(buf.id, op, offset, shape, stride, connection, u64, u64_buffers),
+        DType::U128 => apply_elementwise_binary_nd_for_dtype!(buf.id, op, offset, shape, stride, connection, u128, u128_buffers),
+        DType::I8 => apply_elementwise_binary_nd_for_dtype!(buf.id, op, offset, shape, stride, connection, i8, i8_buffers),
+        DType::I16 => apply_elementwise_binary_nd_for_dtype!(buf.id, op, offset, shape, stride, connection, i16, i16_buffers),
+        DType::I32 => apply_elementwise_binary_nd_for_dtype!(buf.id, op, offset, shape, stride, connection, i32, i32_buffers),
+        DType::I64 => apply_elementwise_binary_nd_for_dtype!(buf.id, op, offset, shape, stride, connection, i64, i64_buffers),
+        DType::I128 => apply_elementwise_binary_nd_for_dtype!(buf.id, op, offset, shape, stride, connection, i128, i128_buffers),
+        DType::F32 => apply_elementwise_binary_nd_for_dtype!(buf.id, op, offset, shape, stride, connection, f32, f32_buffers),
+        DType::F64 => apply_elementwise_binary_nd_for_dtype!(buf.id, op, offset, shape, stride, connection, f64, f64_buffers),
+        DType::BOOL => apply_elementwise_binary_nd_for_dtype!(buf.id, op, offset, shape, stride, connection, types::boolean, bool_buffers),
     }
 }
 
@@ -323,8 +320,8 @@ pub(crate) fn dispatch_apply_neg_1d_strided(
 pub(crate) fn dispatch_apply_neg_nd(
     buf: TypelessBuf,
     offset: usize,
-    shape: &[usize],
-    stride: &[isize],
+    shape: Vec<usize>,
+    stride: Vec<isize>,
     connection: &ClientConnection,
 ) -> Result<(), TensorError> {
     match buf.dtype {
@@ -408,7 +405,7 @@ pub(crate) fn dispatch_matmul(
     Ok(())
 }
 
-pub(crate) fn dispath_copy_within(
+pub(crate) fn dispatch_copy_range_within(
     dst: TypelessBuf,
     src: TypelessBuf,
     dst_offset: usize,
@@ -431,4 +428,101 @@ pub(crate) fn dispath_copy_within(
         DType::F64 => copy_within_for_dtype!(dst.id, src.id, dst_offset, src_offset, len, connection, f64, f64_buffers),
         DType::BOOL => copy_within_for_dtype!(dst.id, src.id, dst_offset, src_offset, len, connection, types::boolean, bool_buffers),
     }
+}
+
+
+#[inline(always)]
+pub(crate) fn dispatch_apply_relu_contiguous(
+    buf: TypelessBuf,
+    start: usize,
+    len: usize,
+    connection: &ClientConnection,
+) -> Result<(), TensorError> {
+    todo!()
+}
+
+#[inline(always)]
+pub(crate) fn dispatch_apply_relu_1d_strided(
+    buf: TypelessBuf,
+    offset: usize,
+    stride: isize,
+    len: usize,
+    connection: &ClientConnection,
+) -> Result<(), TensorError> {
+    todo!()
+}
+
+#[inline(always)]
+pub(crate) fn dispatch_apply_relu_nd(
+    buf: TypelessBuf,
+    offset: usize,
+    shape: Vec<usize>,
+    stride: Vec<isize>,
+    connection: &ClientConnection,
+) -> Result<(), TensorError> {
+    todo!()
+}
+
+#[inline(always)]
+pub(crate) fn dispatch_apply_tanh_contiguous(
+    buf: TypelessBuf,
+    start: usize,
+    len: usize,
+    connection: &ClientConnection,
+) -> Result<(), TensorError> {
+    todo!()
+}
+
+#[inline(always)]
+pub(crate) fn dispatch_apply_tanh_1d_strided(
+    buf: TypelessBuf,
+    offset: usize,
+    stride: isize,
+    len: usize,
+    connection: &ClientConnection,
+) -> Result<(), TensorError> {
+    todo!()
+}
+
+#[inline(always)]
+pub(crate) fn dispatch_apply_tanh_nd(
+    buf: TypelessBuf,
+    offset: usize,
+    shape: Vec<usize>,
+    stride: Vec<isize>,
+    connection: &ClientConnection,
+) -> Result<(), TensorError> {
+    todo!()
+}
+
+#[inline(always)]
+pub(crate) fn dispatch_apply_sigmoid_contiguous(
+    buf: TypelessBuf,
+    start: usize,
+    len: usize,
+    connection: &ClientConnection,
+) -> Result<(), TensorError> {
+    todo!()
+}
+
+#[inline(always)]
+pub(crate) fn dispatch_apply_sigmoid_1d_strided(
+    buf: TypelessBuf,
+    offset: usize,
+    stride: isize,
+    len: usize,
+    connection: &ClientConnection,
+) -> Result<(), TensorError> {
+    todo!()
+}
+
+#[inline(always)]
+pub(crate) fn dispatch_apply_sigmoid_nd(
+    buf: TypelessBuf,
+    offset: usize,
+    shape: Vec<usize>,
+    stride: Vec<isize>,
+    connection: &ClientConnection,
+) -> Result<(), TensorError> {
+    todo!()
 }

@@ -78,10 +78,13 @@ pub fn request_handle(attr: TokenStream, item: TokenStream) -> TokenStream {
         fn handle_request_(
             message: #enum_ident,
             task_id: u32,
-            connection: #connection_type
+            connection: &#connection_type
         ) {
             match message {
                 #match_body
+                _ => {
+                    panic!("Unexpected request type.")
+                }
             };
         }
     }.into()
@@ -99,8 +102,8 @@ fn process_variant(variant: &Variant, variant_args: &VariantArgs, enum_ident: &I
             #( #values ),* 
             connection
         );
-        let message = #enum_ident::#response_variant(result);
         let err = result.as_ref().err().cloned();
+        let message = #enum_ident::#response_variant(result);
         // todo - Response as an arg
         let response = Response {
             asynchronous: false,
@@ -256,7 +259,7 @@ pub fn routines(attr: TokenStream, item: TokenStream) -> TokenStream {
             let rpc_args = if let Some(attr) = rpc_attr(&method.attrs) {
                 let args = RpcMethodArgs::parse(attr).expect("Failed to parse args");
                 // Remove the helper attribute so it doesn't appear in output
-                method.attrs.retain(|a| !a.path().is_ident("rpc"));
+                method.attrs.retain(|a| !a.path().is_ident("rpc")); 
                 Some(args)
             } else {
                 None
